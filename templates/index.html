@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyAIGist - AI-Powered Q&A</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div style="width:60px;height:60px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:2rem;font-weight:bold;">🧠</div>
+                <h1>MyAIGist</h1>
+            </div>
+            <p class="subtitle">AI-Powered Content Analysis & Q&A</p>
+        </header>
+
+        <!-- Content Input Section -->
+        <section class="input-section">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="text">📝 Text</button>
+                <button class="tab-btn" data-tab="file">📄 Document</button>
+            </div>
+
+            <div class="tab-content">
+                <!-- Text Input -->
+                <div id="text-tab" class="tab-panel active">
+                    <textarea 
+                        id="text-input" 
+                        placeholder="Enter your text here for AI analysis..."
+                        rows="8"
+                    ></textarea>
+                </div>
+
+                <!-- File Upload -->
+                <div id="file-tab" class="tab-panel">
+                    <div class="file-upload">
+                        <input type="file" id="file-input" accept=".pdf,.docx,.txt" />
+                        <label for="file-input">
+                            📄 Choose Document (PDF, DOCX, TXT)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Options -->
+            <div class="summary-options">
+                <label class="summary-label">📋 Summary Detail Level:</label>
+                <div class="summary-buttons">
+                    <button type="button" class="summary-btn" data-level="quick">
+                        <span class="summary-icon">⚡</span>
+                        <span class="summary-title">Quick</span>
+                        <span class="summary-desc">2-3 key points</span>
+                    </button>
+                    <button type="button" class="summary-btn active" data-level="standard">
+                        <span class="summary-icon">📄</span>
+                        <span class="summary-title">Standard</span>
+                        <span class="summary-desc">Balanced overview</span>
+                    </button>
+                    <button type="button" class="summary-btn" data-level="detailed">
+                        <span class="summary-icon">📚</span>
+                        <span class="summary-title">Detailed</span>
+                        <span class="summary-desc">Comprehensive analysis</span>
+                    </button>
+                </div>
+            </div>
+
+            <button id="process-btn" class="primary-btn">🚀 Analyze Content</button>
+        </section>
+
+        <!-- Processing Status -->
+        <div id="status" class="status hidden"></div>
+
+        <!-- Summary Section -->
+        <section id="summary-section" class="summary-section hidden">
+            <div class="summary-header">
+                <h2>📋 Content Summary</h2>
+                <span id="summary-level-indicator" class="summary-level-badge">Standard</span>
+            </div>
+            <div id="summary-text" class="summary-text"></div>
+            <audio id="summary-audio" controls class="audio-player"></audio>
+        </section>
+
+        <!-- Q&A Section -->
+        <section id="qa-section" class="qa-section hidden">
+            <h2>💬 Ask Questions</h2>
+            
+            <!-- Question Input -->
+            <div class="question-input">
+                <div class="input-group-simple">
+                    <input 
+                        type="text" 
+                        id="question-text" 
+                        placeholder="Type your question or click the mic to speak..."
+                    />
+                    <button id="mic-btn" class="mic-button" type="button">
+                        <span class="mic-icon">🎤</span>
+                        <span class="mic-text">Speak</span>
+                    </button>
+                </div>
+                <button id="ask-btn" class="primary-btn">Ask Question</button>
+            </div>
+
+            <!-- Recording Status -->
+            <div id="recording-status" class="recording-status hidden">
+                <div class="recording-info">
+                    <div class="recording-indicator">
+                        <span class="pulse-dot"></span>
+                        <span class="recording-text">🎤 Recording... Click mic again to stop</span>
+                    </div>
+                    <div class="recording-timer">0:00</div>
+                </div>
+            </div>
+
+            <!-- Playback Section -->
+            <div id="playback-section" class="playback-section hidden">
+                <div class="playback-info">
+                    <span class="playback-label">🎵 Your Question:</span>
+                    <audio id="recorded-audio" controls></audio>
+                    <button id="transcribe-btn" class="secondary-btn">✅ Transcribe & Use</button>
+                    <button id="re-record-btn" class="secondary-btn">🔄 Record Again</button>
+                </div>
+            </div>
+
+            <!-- Answer Section -->
+            <div id="answer-section" class="answer-section">
+                <div id="answer-text" class="answer-text"></div>
+                <audio id="answer-audio" controls class="audio-player"></audio>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

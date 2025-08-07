@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Microphone Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f0f0; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>🎤 Microphone Debug Test</h1>
+    <p>Use this page to test if your microphone is working before using MyAIGist.</p>
+    
+    <button id="test-mic">Test Microphone Access</button>
+    <button id="start-record">Start Recording</button>
+    <button id="stop-record">Stop Recording</button>
+    
+    <div id="status"></div>
+    <audio id="playback" controls style="width: 100%; margin-top: 20px;"></audio>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let stream;
+
+        function log(message, type = 'info') {
+            const status = document.getElementById('status');
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            status.appendChild(div);
+            console.log(message);
+        }
+
+        document.getElementById('test-mic').onclick = async () => {
+            try {
+                log('Testing microphone access...');
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                log('✅ Microphone access granted!', 'success');
+                
+                // Stop the test stream
+                stream.getTracks().forEach(track => track.stop());
+                log('Test complete - microphone is available', 'success');
+            } catch (error) {
+                log('❌ Microphone test failed: ' + error.message, 'error');
+                log('Error name: ' + error.name, 'error');
+            }
+        };
+
+        document.getElementById('start-record').onclick = async () => {
+            try {
+                log('Starting recording test...');
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { sampleRate: 44100, channelCount: 1 }
+                });
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+                
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    log('Audio data received: ' + event.data.size + ' bytes');
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    log('Recording stopped');
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    log('Created audio blob: ' + audioBlob.size + ' bytes', 'success');
+                    
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    document.getElementById('playback').src = audioUrl;
+                    log('Audio ready for playback!', 'success');
+                };
+                
+                mediaRecorder.start(1000);
+                log('✅ Recording started!', 'success');
+                
+            } catch (error) {
+                log('❌ Recording failed: ' + error.message, 'error');
+            }
+        };
+
+        document.getElementById('stop-record').onclick = () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                stream.getTracks().forEach(track => track.stop());
+                log('Recording stopped by user', 'info');
+            } else {
+                log('No active recording to stop', 'error');
+            }
+        };
+
+        log('Debug page loaded. Click "Test Microphone Access" first.');
+    </script>
+</body>
+</html>
