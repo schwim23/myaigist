@@ -1,87 +1,164 @@
 """
-Q&A agent with RAG (Retrieval Augmented Generation) - Python 3.13 Compatible
-Uses scikit-learn instead of faiss for vector similarity search
+Q&A Agent for answering questions using RAG (Retrieval-Augmented Generation)
 """
+
 import os
 import numpy as np
 from typing import List, Dict
 from openai import OpenAI
-import tiktoken
+
+try:
+    import tiktoken
+except ImportError:
+    tiktoken = None
+
 from sklearn.metrics.pairwise import cosine_similarity
 
 class QAAgent:
-    """Agent responsible for question answering using RAG"""
-    
-    def __init__(self):
-        self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-        self.model = "gpt-3.5-turbo"
-        self.embedding_model = "text-embedding-3-small"
-        
-        # Document storage
+    def __init__(self, api_key: str):
+        """Initialize the Q&A agent with OpenAI API key"""
+        self.client = OpenAI(api_key=api_key)
         self.documents = []
         self.embeddings = []
-        self.document_metadata = []
+        self.model = "gpt-3.5-turbo"
+        self.embedding_model = "text-embedding-ada-002"
         
-        # Initialize tokenizer
-        self.tokenizer = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        # Initialize tokenizer if available
+        if tiktoken is not None:
+            try:
+                self.tokenizer = tiktoken.encoding_for_model(self.model)
+            except Exception as e:
+                print(f"Warning: Could not initialize tiktoken: {e}")
+                self.tokenizer = None
+        else:
+            self.tokenizer = None
+            print("Warning: tiktoken not available, using simple token estimation")
     
-    def add_document(self, text: str, title: str = "Document"):
-        """
-        Add a document to the knowledge base
+    def count_tokens(self, text: str) -> int:
+        """Count tokens in text, with fallback for when tiktoken is unavailable"""
+        if self.tokenizer is not None:
+            try:
+                return len(self.tokenizer.encode(text))
+            except Exception:
+                pass
         
-        Args:
-            text: Document text content
-            title: Document title/name
-        """
+        # Simple fallback: approximately 4 characters per token
+        return len(text) // 4
+    
+    def chunk_text(self, text: str, max_tokens: int = 500) -> List[str]:
+        """Split text into chunks that fit within token limits"""
+        if not text:
+            return []
+        
+        # Simple chunking by sentences if tiktoken unavailable
+        if self.tokenizer is None:
+            sentences = text.split('. ')
+            chunks = []
+            current_chunk = ""
+            
+            for sentence in sentences:
+                test_chunk = current_chunk + sentence + ". "
+                if self.count_tokens(test_chunk) > max_tokens and current_chunk:
+                    chunks.append(current_chunk.strip())
+                    current_chunk = sentence + ". "
+                else:
+                    current_chunk = test_chunk
+            
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            
+            return chunks
+        
+        # Use tiktoken for precise chunking if available
+        tokens = self.tokenizer.encode(text)
+        chunks = []
+        
+        for i in range(0, len(tokens), max_tokens):
+            chunk_tokens = tokens[i:i + max_tokens]
+            chunk_text = self.tokenizer.decode(chunk_tokens)
+            chunks.append(chunk_text)
+        
+        return chunks
+    
+    def get_embedding(self, text: str) -> List[float]:
+        """Get embedding for text using OpenAI API"""
         try:
-            # Clear previous documents (for simplicity)
-            self.documents = []
-            self.embeddings = []
-            self.document_metadata = []
-            
-            # Split text into chunks for better retrieval
-            chunks = self._chunk_text(text)
-            
-            for i, chunk in enumerate(chunks):
-                # Generate embedding
-                embedding = self._get_embedding(chunk)
-                
-                # Store document chunk
-                self.documents.append(chunk)
-                self.embeddings.append(embedding)
-                self.document_metadata.append({
-                    'title': title,
-                    'chunk_id': i,
-                    'total_chunks': len(chunks)
-                })
-            
-            print(f"Added {len(chunks)} chunks from '{title}' to knowledge base")
-            
+            response = self.client.embeddings.create(
+                input=text,
+                model=self.embedding_model
+            )
+            return response.data[0].embedding
         except Exception as e:
-            raise RuntimeError(f"Error adding document: {str(e)}")
+            print(f"Error getting embedding: {e}")
+            return [0.0] * 1536  # Default embedding dimension
     
-    def answer_question(self, question: str) -> str:
-        """
-        Answer a question based on stored documents
+    def add_document(self, content: str, metadata: Dict = None):
+        """Add a document to the knowledge base"""
+        if not content:
+            return
         
-        Args:
-            question: User's question
-            
-        Returns:
-            Generated answer
-        """
+        # Split into chunks
+        chunks = self.chunk_text(content)
+        
+        for chunk in chunks:
+            if chunk.strip():
+                # Get embedding
+                embedding = self.get_embedding(chunk)
+                
+                # Store document and embedding
+                doc_data = {
+                    'content': chunk,
+                    'metadata': metadata or {}
+                }
+                self.documents.append(doc_data)
+                self.embeddings.append(embedding)
+    
+    def search_similar(self, query: str, top_k: int = 3) -> List[Dict]:
+        """Search for similar documents using cosine similarity"""
         if not self.documents:
-            raise RuntimeError("No documents available. Please upload content first.")
+            return []
         
+        # Get query embedding
+        query_embedding = self.get_embedding(query)
+        
+        # Calculate similarities
+        similarities = cosine_similarity(
+            [query_embedding], 
+            self.embeddings
+        )[0]
+        
+        # Get top-k most similar documents
+        top_indices = np.argsort(similarities)[::-1][:top_k]
+        
+        results = []
+        for idx in top_indices:
+            results.append({
+                'content': self.documents[idx]['content'],
+                'metadata': self.documents[idx]['metadata'],
+                'similarity': similarities[idx]
+            })
+        
+        return results
+    
+    def answer_question(self, question: str, context_docs: List[str] = None) -> str:
+        """Answer a question using RAG approach"""
         try:
-            # Find relevant document chunks
-            relevant_chunks = self._find_relevant_chunks(question, top_k=3)
+            # If no context provided, search for relevant documents
+            if context_docs is None:
+                similar_docs = self.search_similar(question, top_k=3)
+                context_docs = [doc['content'] for doc in similar_docs]
             
-            # Build context from relevant chunks
-            context = "\n\n".join([chunk['content'] for chunk in relevant_chunks])
+            # Prepare context
+            context = "\n\n".join(context_docs[:3])  # Limit context length
             
-            # Generate answer
-            prompt = f"""Based on the following context, please answer the question accurately and comprehensively.
+            # Limit context to prevent token overflow
+            max_context_tokens = 2000
+            if self.count_tokens(context) > max_context_tokens:
+                # Truncate context if too long
+                context = context[:max_context_tokens * 4]  # Rough character limit
+            
+            # Create prompt
+            prompt = f"""Based on the following context, please answer the question. If the answer is not in the context, say so clearly.
 
 Context:
 {context}
@@ -90,103 +167,32 @@ Question: {question}
 
 Answer:"""
             
+            # Get response from OpenAI
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-                max_tokens=1000
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that answers questions based on provided context."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500,
+                temperature=0.7
             )
             
-            answer = response.choices[0].message.content.strip()
-            
-            # Add source information
-            sources = set([chunk['metadata']['title'] for chunk in relevant_chunks])
-            if len(sources) == 1:
-                answer += f"\n\n*Source: {list(sources)[0]}*"
-            else:
-                answer += f"\n\n*Sources: {', '.join(sources)}*"
-            
-            return answer
+            return response.choices[0].message.content.strip()
             
         except Exception as e:
-            raise RuntimeError(f"Error answering question: {str(e)}")
+            print(f"Error answering question: {e}")
+            return f"Sorry, I encountered an error while processing your question: {str(e)}"
     
-    def _chunk_text(self, text: str, chunk_size: int = 500) -> List[str]:
-        """Split text into smaller chunks for better retrieval"""
-        # Split by sentences first
-        sentences = text.replace('\n', ' ').split('. ')
-        
-        chunks = []
-        current_chunk = ""
-        
-        for sentence in sentences:
-            # Check if adding this sentence exceeds chunk size
-            test_chunk = current_chunk + ". " + sentence if current_chunk else sentence
-            
-            if len(self.tokenizer.encode(test_chunk)) <= chunk_size:
-                current_chunk = test_chunk
-            else:
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                current_chunk = sentence
-        
-        # Add the last chunk
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-        
-        return chunks if chunks else [text[:2000]]  # Fallback for very long text
+    def clear_documents(self):
+        """Clear all stored documents"""
+        self.documents = []
+        self.embeddings = []
     
-    def _get_embedding(self, text: str) -> List[float]:
-        """Get embedding for text"""
-        try:
-            response = self.client.embeddings.create(
-                model=self.embedding_model,
-                input=text
-            )
-            return response.data[0].embedding
-        except Exception as e:
-            raise RuntimeError(f"Error generating embedding: {str(e)}")
-    
-    def _find_relevant_chunks(self, question: str, top_k: int = 3) -> List[Dict]:
-        """Find most relevant document chunks for a question using scikit-learn"""
-        if not self.embeddings:
-            return []
-        
-        try:
-            # Get question embedding
-            question_embedding = self._get_embedding(question)
-            
-            # Convert to numpy arrays for scikit-learn
-            question_array = np.array(question_embedding).reshape(1, -1)
-            embeddings_array = np.array(self.embeddings)
-            
-            # Calculate cosine similarities
-            similarities = cosine_similarity(question_array, embeddings_array)[0]
-            
-            # Get top k most similar chunks
-            top_indices = np.argsort(similarities)[-top_k:][::-1]  # Reverse for descending order
-            
-            relevant_chunks = []
-            for idx in top_indices:
-                if similarities[idx] > 0.1:  # Minimum similarity threshold
-                    relevant_chunks.append({
-                        'index': idx,
-                        'similarity': float(similarities[idx]),
-                        'content': self.documents[idx],
-                        'metadata': self.document_metadata[idx]
-                    })
-            
-            return relevant_chunks
-            
-        except Exception as e:
-            print(f"Error in similarity search: {e}")
-            # Fallback: return first few chunks
-            return [
-                {
-                    'index': i,
-                    'similarity': 0.5,
-                    'content': self.documents[i],
-                    'metadata': self.document_metadata[i]
-                }
-                for i in range(min(top_k, len(self.documents)))
-            ]
+    def get_stats(self) -> Dict:
+        """Get statistics about the knowledge base"""
+        return {
+            'document_count': len(self.documents),
+            'total_tokens': sum(self.count_tokens(doc['content']) for doc in self.documents),
+            'has_tiktoken': tiktoken is not None
+        }
