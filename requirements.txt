@@ -1,21 +1,21 @@
-# Flask Web Framework
-flask>=3.0.0
-python-dotenv>=1.0.0
-werkzeug>=3.0.0
+# Flask Web Framework (Python 3.7 compatible)
+flask>=2.2.0,<3.0.0
+python-dotenv>=0.19.0
+werkzeug>=2.2.0,<3.0.0
 
-# OpenAI API
-openai>=1.30.0
+# OpenAI API (Python 3.7 compatible)
+openai>=0.27.0,<2.0.0
 
 # Document Processing
-PyPDF2>=3.0.1
-python-docx>=1.1.0
+PyPDF2>=2.0.0
+python-docx>=0.8.11
 
 # Vector Search and ML
-numpy>=1.26.0
-scikit-learn>=1.3.0
+numpy>=1.21.0,<2.0.0
+scikit-learn>=1.0.0,<2.0.0
 
 # Text Processing
-tiktoken>=0.5.1
+tiktoken>=0.3.0
 
 # Production Server
-gunicorn>=21.0.0
+gunicorn>=20.0.0
