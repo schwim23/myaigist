@@ -1,8 +1,8 @@
 from .openai_client import get_openai_client
 
-class Transcriber:
-    """Agent for audio transcription"""
+class Embedder:
+    """Agent for creating embeddings"""
 
     def __init__(self):
         self.client = get_openai_client()
-        self.model = "gpt-4o-mini-transcribe"
+        self.model = "text-embedding-3-large"
