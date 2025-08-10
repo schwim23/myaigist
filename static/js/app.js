@@ -322,17 +322,29 @@ class MyAIGist {
                 body: formData
             });
 
-            const result = await response.json();
-
+            console.log('📡 Transcription response status:', response.status);
+            
             if (!response.ok) {
-                throw new Error(result.error || 'Transcription failed');
+                let errorMessage = `Transcription failed (${response.status})`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    // If can't parse JSON, use generic message
+                }
+                throw new Error(errorMessage);
             }
 
-            document.getElementById('question-text').value = result.text;
-            this.hidePlaybackSection();
-            this.showStatus('✅ Question transcribed! You can edit it or ask directly.', 'success');
-            
-            console.log('✅ Transcription successful:', result.text);
+            const result = await response.json();
+
+            if (result.success && result.text) {
+                document.getElementById('question-text').value = result.text;
+                this.hidePlaybackSection();
+                this.showStatus('✅ Question transcribed! You can edit it or ask directly.', 'success');
+                console.log('✅ Transcription successful:', result.text);
+            } else {
+                throw new Error(result.error || 'Transcription failed');
+            }
 
         } catch (error) {
             console.error('❌ Transcription error:', error);
@@ -394,17 +406,39 @@ class MyAIGist {
                 ...(isFormData && { body: formData })
             });
 
-            const result = await response.json();
+            console.log('📡 Process content response status:', response.status);
 
             if (!response.ok) {
+                let errorMessage = `Processing failed (${response.status})`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    // If can't parse JSON, use generic message
+                }
+                throw new Error(errorMessage);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showSummary(result.summary, result.audio_url, this.selectedSummaryLevel);
+                this.showQASection();
+                this.showStatus(`Content processed successfully with ${levelNames[this.selectedSummaryLevel]} summary! You can now ask questions.`, 'success');
+                console.log('✅ Content processed successfully, QA stored:', result.qa_stored);
+                
+                // Give the backend a moment to finish processing vectors
+                console.log('⏳ Waiting for vector processing to complete...');
+                setTimeout(() => {
+                    console.log('✅ Vector processing wait complete');
+                }, 2000);
+                
+            } else {
                 throw new Error(result.error || 'Processing failed');
             }
 
-            this.showSummary(result.summary, result.audio_url, this.selectedSummaryLevel);
-            this.showQASection();
-            this.showStatus(`Content processed successfully with ${levelNames[this.selectedSummaryLevel]} summary! You can now ask questions.`, 'success');
-
         } catch (error) {
+            console.error('❌ Process content error:', error);
             this.showStatus(error.message, 'error');
         } finally {
             processBtn.disabled = false;
@@ -416,6 +450,12 @@ class MyAIGist {
         const questionText = document.getElementById('question-text').value.trim();
         const askBtn = document.getElementById('ask-btn');
         
+        console.log('🔍 =========================');
+        console.log('🔍 DEBUG: askQuestion called');
+        console.log('🔍 Question text:', questionText);
+        console.log('🔍 Question length:', questionText.length);
+        console.log('🔍 =========================');
+        
         if (!questionText) {
             this.showStatus('Please enter a question or record one using the microphone', 'error');
             return;
@@ -425,25 +465,152 @@ class MyAIGist {
         askBtn.innerHTML = '<span class="loading-spinner"></span> Thinking...';
 
         try {
-            const response = await fetch('/api/ask-question', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: questionText })
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || 'Failed to get answer');
+            // STEP 1: Check QA agent status with retry logic
+            console.log('📊 STEP 1: Checking QA agent status...');
+            let qaReady = false;
+            let attempts = 0;
+            const maxAttempts = 5; // Increased attempts
+            
+            while (!qaReady && attempts < maxAttempts) {
+                attempts++;
+                console.log(`📊 Attempt ${attempts}/${maxAttempts}: Checking QA status...`);
+                
+                try {
+                    const statusResponse = await fetch('/api/qa-debug');
+                    const statusData = await statusResponse.json();
+                    console.log('📊 QA Status:', statusData);
+                    
+                    if (statusData.ready_for_questions && statusData.documents_loaded > 0) {
+                        qaReady = true;
+                        console.log('✅ QA agent is ready with', statusData.documents_loaded, 'documents');
+                        
+                        // Check if vectors are ready
+                        if (!statusData.qa_agent_status.vectors_ready) {
+                            console.log('⚠️  Vectors not ready, trying to rebuild...');
+                            
+                            // Try to rebuild vectors
+                            try {
+                                const rebuildResponse = await fetch('/api/rebuild-vectors', { method: 'POST' });
+                                const rebuildData = await rebuildResponse.json();
+                                console.log('🔄 Vector rebuild result:', rebuildData);
+                            } catch (rebuildError) {
+                                console.log('❌ Vector rebuild failed:', rebuildError);
+                            }
+                        }
+                        break;
+                    } else {
+                        console.log(`❌ QA not ready (attempt ${attempts}): ready=${statusData.ready_for_questions}, docs=${statusData.documents_loaded}`);
+                        
+                        if (attempts < maxAttempts) {
+                            console.log('⏳ Waiting 1.5 seconds before retry...');
+                            await new Promise(resolve => setTimeout(resolve, 1500));
+                        }
+                    }
+                } catch (error) {
+                    console.error(`❌ QA status check failed (attempt ${attempts}):`, error);
+                    if (attempts === maxAttempts) {
+                        throw new Error('Cannot verify if documents are loaded. Please try uploading content first.');
+                    }
+                }
+            }
+            
+            if (!qaReady) {
+                console.log('❌ QA agent not ready after all attempts');
+                this.showStatus('No documents are loaded. Please upload and process a document first.', 'error');
+                return;
             }
 
-            this.showAnswer(result.answer, result.audio_url);
+            // STEP 2: Create and log the exact request payload
+            const requestPayload = { question: questionText };
+            console.log('📤 STEP 2: Request payload:', JSON.stringify(requestPayload, null, 2));
+            
+            // STEP 3: Send the request with detailed logging
+            console.log('📤 STEP 3: Sending request to /api/ask-question...');
+            
+            const response = await fetch('/api/ask-question', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(requestPayload)
+            });
+
+            // STEP 4: Log the complete response details
+            console.log('📡 STEP 4: Response received');
+            console.log('📡 Status:', response.status);
+            console.log('📡 Status Text:', response.statusText);
+            console.log('📡 OK:', response.ok);
+
+            // STEP 5: Handle response
+            if (!response.ok) {
+                console.log('❌ STEP 5: Response not OK, getting error details...');
+                
+                const responseText = await response.text();
+                console.log('❌ Raw response text:', responseText);
+                
+                let errorMessage = `Request failed with status ${response.status}`;
+                
+                try {
+                    const errorData = JSON.parse(responseText);
+                    console.log('❌ Parsed error data:', errorData);
+                    
+                    if (errorData.error) {
+                        errorMessage = errorData.error;
+                        
+                        if (errorData.qa_status) {
+                            console.log('❌ QA Status from error:', errorData.qa_status);
+                        }
+                    }
+                } catch (parseError) {
+                    console.log('❌ Could not parse error response as JSON:', parseError);
+                    errorMessage = `Server error (${response.status}): ${responseText}`;
+                }
+                
+                if (response.status === 400 && errorMessage.includes('No documents')) {
+                    errorMessage = '📄 Please upload and process a document first, then ask your question.';
+                }
+                
+                throw new Error(errorMessage);
+            }
+
+            // STEP 6: Process successful response
+            console.log('✅ STEP 6: Processing successful response...');
+            const responseText = await response.text();
+            console.log('✅ Raw response text (first 200 chars):', responseText.substring(0, 200));
+            
+            const result = JSON.parse(responseText);
+            console.log('✅ Parsed response data:', result);
+
+            if (result.success && result.answer) {
+                console.log('✅ Answer received:', result.answer.substring(0, 100) + '...');
+                
+                // Check if answer seems wrong (contains "not mentioned" etc.)
+                if (result.answer.toLowerCase().includes('not mentioned') || 
+                    result.answer.toLowerCase().includes('does not mention') ||
+                    result.answer.toLowerCase().includes('no information') ||
+                    result.answer.toLowerCase().includes('does not contain')) {
+                    console.log('⚠️  Answer seems inaccurate - possible context retrieval issue');
+                    console.log('⚠️  This might indicate vectors are not working properly');
+                }
+                
+                this.showAnswer(result.answer, result.audio_url);
+                document.getElementById('question-text').value = '';
+                this.showStatus('✅ Question answered successfully!', 'success');
+            } else {
+                throw new Error(result.error || 'No answer received');
+            }
 
         } catch (error) {
-            this.showStatus(error.message, 'error');
+            console.error('❌ COMPLETE ERROR DETAILS:');
+            console.error('❌ Error message:', error.message);
+            console.error('❌ Error stack:', error.stack);
+            
+            this.showStatus(`❌ ${error.message}`, 'error');
         } finally {
             askBtn.disabled = false;
             askBtn.innerHTML = 'Ask Question';
+            console.log('🔍 ========================= END DEBUG =========================');
         }
     }
 

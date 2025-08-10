@@ -1,0 +1,20 @@
+services:
+  myaigist:
+    build: .
+    container_name: myaigist-app
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FLASK_ENV=production
+      - MAX_CONTENT_LENGTH=52428800  # 50MB
+    volumes:
+      # Mount uploads directory for persistence
+      - ./uploads:/app/uploads
+      - ./static/audio:/app/static/audio
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

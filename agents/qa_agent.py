@@ -1,198 +1,370 @@
-"""
-Q&A Agent for answering questions using RAG (Retrieval-Augmented Generation)
-"""
-
 import os
-import numpy as np
-from typing import List, Dict
 from openai import OpenAI
-
-try:
-    import tiktoken
-except ImportError:
-    tiktoken = None
-
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+from typing import List, Dict, Any
+import re
 
 class QAAgent:
-    def __init__(self, api_key: str):
-        """Initialize the Q&A agent with OpenAI API key"""
-        self.client = OpenAI(api_key=api_key)
-        self.documents = []
-        self.embeddings = []
-        self.model = "gpt-3.5-turbo"
-        self.embedding_model = "text-embedding-ada-002"
-        
-        # Initialize tokenizer if available
-        if tiktoken is not None:
-            try:
-                self.tokenizer = tiktoken.encoding_for_model(self.model)
-            except Exception as e:
-                print(f"Warning: Could not initialize tiktoken: {e}")
-                self.tokenizer = None
-        else:
-            self.tokenizer = None
-            print("Warning: tiktoken not available, using simple token estimation")
+    """Agent responsible for question answering using RAG approach"""
     
-    def count_tokens(self, text: str) -> int:
-        """Count tokens in text, with fallback for when tiktoken is unavailable"""
-        if self.tokenizer is not None:
-            try:
-                return len(self.tokenizer.encode(text))
-            except Exception:
-                pass
-        
-        # Simple fallback: approximately 4 characters per token
-        return len(text) // 4
+    def __init__(self):
+        """Initialize the QA Agent"""
+        try:
+            self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+            self.model = "gpt-3.5-turbo"
+            
+            # Storage for documents and their metadata
+            self.documents = []  # List of {'text': str, 'title': str, 'chunks': List[str]}
+            self.all_chunks = []  # All text chunks for searching
+            self.chunk_metadata = []  # Metadata for each chunk (doc_index, chunk_index)
+            
+            # TF-IDF components - more lenient configuration
+            self.vectorizer = TfidfVectorizer(
+                max_features=1000,  # Reduced for better matching
+                stop_words='english',
+                ngram_range=(1, 2),  # Include bigrams
+                max_df=0.9,  # Allow more common terms
+                min_df=1,    # Include all terms
+                lowercase=True,
+                strip_accents='unicode'
+            )
+            self.chunk_vectors = None
+            
+            print("✅ QAAgent initialized successfully")
+            
+        except Exception as e:
+            print(f"❌ Error initializing QAAgent: {e}")
+            raise
     
-    def chunk_text(self, text: str, max_tokens: int = 500) -> List[str]:
-        """Split text into chunks that fit within token limits"""
-        if not text:
-            return []
+    def add_document(self, text: str, title: str = "Document") -> bool:
+        """
+        Add a document to the knowledge base
         
-        # Simple chunking by sentences if tiktoken unavailable
-        if self.tokenizer is None:
-            sentences = text.split('. ')
-            chunks = []
-            current_chunk = ""
+        Args:
+            text (str): Document text
+            title (str): Document title
             
-            for sentence in sentences:
-                test_chunk = current_chunk + sentence + ". "
-                if self.count_tokens(test_chunk) > max_tokens and current_chunk:
-                    chunks.append(current_chunk.strip())
-                    current_chunk = sentence + ". "
-                else:
-                    current_chunk = test_chunk
+        Returns:
+            bool: Success status
+        """
+        try:
+            if not text or len(text.strip()) < 10:
+                print("⚠️  Document too short to add")
+                return False
             
-            if current_chunk:
-                chunks.append(current_chunk.strip())
+            # Clean and chunk the text
+            cleaned_text = self._clean_text(text)
+            chunks = self._chunk_text(cleaned_text)
             
-            return chunks
+            if not chunks:
+                print("⚠️  No chunks created from document")
+                return False
+            
+            # Store document
+            doc_index = len(self.documents)
+            document = {
+                'text': cleaned_text,
+                'title': title,
+                'chunks': chunks
+            }
+            self.documents.append(document)
+            
+            # Add chunks to global storage
+            for chunk_index, chunk in enumerate(chunks):
+                self.all_chunks.append(chunk)
+                self.chunk_metadata.append({
+                    'doc_index': doc_index,
+                    'chunk_index': chunk_index,
+                    'title': title
+                })
+            
+            # Rebuild vectors
+            self._rebuild_vectors()
+            
+            print(f"✅ Added document '{title}' with {len(chunks)} chunks")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error adding document: {e}")
+            return False
+    
+    def answer_question(self, question: str) -> str:
+        """
+        Answer a question using the stored documents
         
-        # Use tiktoken for precise chunking if available
-        tokens = self.tokenizer.encode(text)
+        Args:
+            question (str): User question
+            
+        Returns:
+            str: Generated answer
+        """
+        try:
+            if not question or len(question.strip()) < 3:
+                return "Please provide a valid question."
+            
+            # Check if we have any documents
+            if not self.documents:
+                return "No documents have been uploaded yet. Please upload a document first, then ask your question."
+            
+            if not self.all_chunks:
+                return "No content available for answering questions. Please upload a document first."
+            
+            print(f"❓ Processing question: {question}")
+            print(f"📚 Available documents: {len(self.documents)}")
+            print(f"📄 Available chunks: {len(self.all_chunks)}")
+            
+            # Get relevant context
+            relevant_context = self._get_relevant_context(question)
+            
+            if not relevant_context:
+                return "I couldn't find relevant information in the uploaded documents to answer your question."
+            
+            # Generate answer using OpenAI
+            answer = self._generate_answer(question, relevant_context)
+            
+            print(f"✅ Generated answer for question")
+            return answer
+            
+        except Exception as e:
+            error_msg = f"Error answering question: {str(e)}"
+            print(f"❌ {error_msg}")
+            return error_msg
+    
+    def _clean_text(self, text: str) -> str:
+        """Clean and normalize text"""
+        # Remove extra whitespace and normalize
+        text = re.sub(r'\s+', ' ', text)
+        text = text.strip()
+        return text
+    
+    def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
+        """
+        Split text into overlapping chunks
+        
+        Args:
+            text (str): Text to chunk
+            chunk_size (int): Size of each chunk
+            overlap (int): Overlap between chunks
+            
+        Returns:
+            List[str]: List of text chunks
+        """
+        if len(text) <= chunk_size:
+            return [text]
+        
         chunks = []
+        start = 0
         
-        for i in range(0, len(tokens), max_tokens):
-            chunk_tokens = tokens[i:i + max_tokens]
-            chunk_text = self.tokenizer.decode(chunk_tokens)
-            chunks.append(chunk_text)
+        while start < len(text):
+            end = start + chunk_size
+            
+            # Try to break at sentence boundary
+            if end < len(text):
+                # Look for sentence ending within last 100 chars
+                for i in range(min(100, chunk_size)):
+                    if text[end - i - 1] in '.!?':
+                        end = end - i
+                        break
+            
+            chunk = text[start:end].strip()
+            if chunk:
+                chunks.append(chunk)
+            
+            start = end - overlap
+            
+            # Prevent infinite loop
+            if start >= len(text):
+                break
         
         return chunks
     
-    def get_embedding(self, text: str) -> List[float]:
-        """Get embedding for text using OpenAI API"""
+    def _rebuild_vectors(self):
+        """Rebuild TF-IDF vectors for all chunks"""
         try:
-            response = self.client.embeddings.create(
-                input=text,
-                model=self.embedding_model
-            )
-            return response.data[0].embedding
-        except Exception as e:
-            print(f"Error getting embedding: {e}")
-            return [0.0] * 1536  # Default embedding dimension
-    
-    def add_document(self, content: str, metadata: Dict = None):
-        """Add a document to the knowledge base"""
-        if not content:
-            return
-        
-        # Split into chunks
-        chunks = self.chunk_text(content)
-        
-        for chunk in chunks:
-            if chunk.strip():
-                # Get embedding
-                embedding = self.get_embedding(chunk)
+            if self.all_chunks:
+                self.chunk_vectors = self.vectorizer.fit_transform(self.all_chunks)
+                print(f"🔄 Rebuilt vectors for {len(self.all_chunks)} chunks")
+            else:
+                self.chunk_vectors = None
+                print("⚠️  No chunks available for vectorization")
                 
-                # Store document and embedding
-                doc_data = {
-                    'content': chunk,
-                    'metadata': metadata or {}
-                }
-                self.documents.append(doc_data)
-                self.embeddings.append(embedding)
+        except Exception as e:
+            print(f"❌ Error rebuilding vectors: {e}")
+            self.chunk_vectors = None
     
-    def search_similar(self, query: str, top_k: int = 3) -> List[Dict]:
-        """Search for similar documents using cosine similarity"""
-        if not self.documents:
-            return []
+    def _get_relevant_context(self, question: str, top_k: int = 3) -> str:
+        """
+        Get most relevant text chunks for the question
         
-        # Get query embedding
-        query_embedding = self.get_embedding(query)
-        
-        # Calculate similarities
-        similarities = cosine_similarity(
-            [query_embedding], 
-            self.embeddings
-        )[0]
-        
-        # Get top-k most similar documents
-        top_indices = np.argsort(similarities)[::-1][:top_k]
-        
-        results = []
-        for idx in top_indices:
-            results.append({
-                'content': self.documents[idx]['content'],
-                'metadata': self.documents[idx]['metadata'],
-                'similarity': similarities[idx]
-            })
-        
-        return results
-    
-    def answer_question(self, question: str, context_docs: List[str] = None) -> str:
-        """Answer a question using RAG approach"""
+        Args:
+            question (str): User question
+            top_k (int): Number of top chunks to return
+            
+        Returns:
+            str: Combined relevant context
+        """
         try:
-            # If no context provided, search for relevant documents
-            if context_docs is None:
-                similar_docs = self.search_similar(question, top_k=3)
-                context_docs = [doc['content'] for doc in similar_docs]
+            if not self.chunk_vectors or not self.all_chunks:
+                # Fallback: return first part of most recent document
+                if self.documents:
+                    latest_doc = self.documents[-1]
+                    print(f"🔄 Using fallback context from: {latest_doc['title']}")
+                    return latest_doc['text'][:2000]
+                return ""
             
-            # Prepare context
-            context = "\n\n".join(context_docs[:3])  # Limit context length
+            print(f"🔍 Searching among {len(self.all_chunks)} chunks for: '{question}'")
             
-            # Limit context to prevent token overflow
-            max_context_tokens = 2000
-            if self.count_tokens(context) > max_context_tokens:
-                # Truncate context if too long
-                context = context[:max_context_tokens * 4]  # Rough character limit
+            # Clean and normalize the question for better matching
+            clean_question = question.lower().strip()
             
-            # Create prompt
-            prompt = f"""Based on the following context, please answer the question. If the answer is not in the context, say so clearly.
+            # Vectorize the question
+            try:
+                question_vector = self.vectorizer.transform([clean_question])
+            except Exception as e:
+                print(f"❌ Error vectorizing question: {e}")
+                # Fallback to keyword matching
+                return self._keyword_fallback(question)
+            
+            # Calculate similarities
+            similarities = cosine_similarity(question_vector, self.chunk_vectors)[0]
+            
+            print(f"📊 Similarity scores - Max: {max(similarities):.3f}, Min: {min(similarities):.3f}, Mean: {np.mean(similarities):.3f}")
+            
+            # Get top k most similar chunks
+            top_indices = np.argsort(similarities)[-top_k:][::-1]
+            
+            relevant_chunks = []
+            for i, idx in enumerate(top_indices):
+                similarity_score = similarities[idx]
+                print(f"  🎯 Chunk {i+1}: similarity={similarity_score:.3f}")
+                
+                if similarity_score > 0.05:  # Lower threshold for better matching
+                    chunk = self.all_chunks[idx]
+                    metadata = self.chunk_metadata[idx]
+                    
+                    # Show preview of matched chunk
+                    preview = chunk[:100] + "..." if len(chunk) > 100 else chunk
+                    print(f"    📝 Matched chunk: {preview}")
+                    
+                    relevant_chunks.append(f"[From: {metadata['title']}]\n{chunk}")
+            
+            if not relevant_chunks:
+                # If no chunks meet threshold, use the best ones anyway
+                print("⚠️  No chunks met similarity threshold, using best matches")
+                for idx in top_indices:
+                    chunk = self.all_chunks[idx]
+                    metadata = self.chunk_metadata[idx]
+                    relevant_chunks.append(f"[From: {metadata['title']}]\n{chunk}")
+                    if len(relevant_chunks) >= 2:  # At least get 2 chunks
+                        break
+            
+            context = "\n\n---\n\n".join(relevant_chunks)
+            print(f"✅ Final context length: {len(context)} characters from {len(relevant_chunks)} chunks")
+            
+            return context
+            
+        except Exception as e:
+            print(f"❌ Error getting relevant context: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to most recent document
+            if self.documents:
+                latest_doc = self.documents[-1]
+                print(f"🔄 Using fallback - latest document: {latest_doc['title']}")
+                return latest_doc['text'][:2000]
+            return ""
+    
+    def _keyword_fallback(self, question: str) -> str:
+        """Fallback keyword-based search when TF-IDF fails"""
+        try:
+            question_words = set(question.lower().split())
+            best_chunks = []
+            
+            for i, chunk in enumerate(self.all_chunks):
+                chunk_words = set(chunk.lower().split())
+                overlap = len(question_words & chunk_words)
+                if overlap > 0:
+                    metadata = self.chunk_metadata[i]
+                    best_chunks.append((overlap, chunk, metadata))
+            
+            # Sort by word overlap
+            best_chunks.sort(key=lambda x: x[0], reverse=True)
+            
+            # Take top 3
+            relevant_chunks = []
+            for overlap, chunk, metadata in best_chunks[:3]:
+                print(f"🔤 Keyword match (overlap: {overlap}): {chunk[:50]}...")
+                relevant_chunks.append(f"[From: {metadata['title']}]\n{chunk}")
+            
+            return "\n\n---\n\n".join(relevant_chunks)
+            
+        except Exception as e:
+            print(f"❌ Keyword fallback failed: {e}")
+            if self.documents:
+                return self.documents[-1]['text'][:2000]
+            return ""
+    
+    def _generate_answer(self, question: str, context: str) -> str:
+        """
+        Generate answer using OpenAI with the provided context
+        
+        Args:
+            question (str): User question
+            context (str): Relevant context
+            
+        Returns:
+            str: Generated answer
+        """
+        system_prompt = """You are a helpful AI assistant that answers questions based on provided context.
 
-Context:
+INSTRUCTIONS:
+1. Answer the question using ONLY the information provided in the context
+2. If the answer isn't clearly in the context, say so honestly
+3. Be specific and cite relevant parts when possible
+4. Keep answers concise but complete
+5. If context contains multiple sources, you can reference them
+
+Format your response naturally and conversationally."""
+
+        user_prompt = f"""Context:
 {context}
 
 Question: {question}
 
-Answer:"""
-            
-            # Get response from OpenAI
+Please answer the question based on the context provided above."""
+
+        try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that answers questions based on provided context."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
                 ],
                 max_tokens=500,
-                temperature=0.7
+                temperature=0.7,
+                top_p=0.9
             )
             
             return response.choices[0].message.content.strip()
             
         except Exception as e:
-            print(f"Error answering question: {e}")
-            return f"Sorry, I encountered an error while processing your question: {str(e)}"
+            return f"Error generating answer: {str(e)}"
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get current status of the QA agent"""
+        return {
+            'documents_count': len(self.documents),
+            'chunks_count': len(self.all_chunks),
+            'vectors_ready': self.chunk_vectors is not None,
+            'ready_for_questions': len(self.all_chunks) > 0
+        }
     
     def clear_documents(self):
         """Clear all stored documents"""
         self.documents = []
-        self.embeddings = []
-    
-    def get_stats(self) -> Dict:
-        """Get statistics about the knowledge base"""
-        return {
-            'document_count': len(self.documents),
-            'total_tokens': sum(self.count_tokens(doc['content']) for doc in self.documents),
-            'has_tiktoken': tiktoken is not None
-        }
+        self.all_chunks = []
+        self.chunk_metadata = []
+        self.chunk_vectors = None
+        print("🗑️  Cleared all documents")
