@@ -394,6 +394,13 @@ dist
 .aws/
 *.pem
 
+# AWS deployment artifacts (environment-specific)
+ecs-task-execution-trust-policy.json
+efs-policy.json
+task-definition.json
+dnsentries.txt
+status.txt
+
 # Google Cloud
 .gcloud/
 service-account-key.json
@@ -469,6 +476,7 @@ site/
 *.temp
 temp/
 tmp/
+@
 
 # Lock files
 *.lock

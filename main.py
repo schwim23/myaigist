@@ -126,6 +126,13 @@ def index():
     ga_measurement_id = os.getenv('GA_MEASUREMENT_ID')
     return render_template('index.html', ga_measurement_id=ga_measurement_id)
 
+@app.route('/about')
+def about():
+    """Serve the about page"""
+    print("ℹ️  Serving about.html")
+    ga_measurement_id = os.getenv('GA_MEASUREMENT_ID')
+    return render_template('about.html', ga_measurement_id=ga_measurement_id)
+
 # Favicon route
 @app.route('/favicon.ico')
 def favicon():

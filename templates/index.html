@@ -20,16 +20,65 @@
         window.gtag = gtag;
     </script>
     {% endif %}
+    
+    <style>
+        .nav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        @media (max-width: 768px) {
+            .nav-header {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .nav-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="logo">
-                <div style="width:60px;height:60px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:2rem;font-weight:bold;">🧠</div>
-                <h1>MyAIGist</h1>
+        <!-- Navigation Header -->
+        <header class="nav-header">
+            <div style="text-align: center;">
+                <div class="logo">
+                    <div style="width:60px;height:60px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:2rem;font-weight:bold;">🧠</div>
+                    <h1 style="color: white;">MyAIGist</h1>
+                </div>
+                <p class="subtitle" style="color: white; opacity: 0.9;">AI-Powered Content Analysis & Q&A</p>
             </div>
-            <p class="subtitle">AI-Powered Content Analysis & Q&A</p>
+            <nav class="nav-links">
+                <a href="/about">ℹ️ About</a>
+                <a href="https://forms.gle/8XqCvB4RHVwZxKy27" target="_blank">💬 Feedback</a>
+            </nav>
         </header>
 
         <!-- Content Input Section -->
