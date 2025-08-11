@@ -1,0 +1,99 @@
+{
+    "services": [
+        {
+            "serviceArn": "arn:aws:ecs:us-east-1:039357025951:service/myaigist-cluster/myaigist-service",
+            "serviceName": "myaigist-service",
+            "clusterArn": "arn:aws:ecs:us-east-1:039357025951:cluster/myaigist-cluster",
+            "loadBalancers": [
+                {
+                    "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:039357025951:targetgroup/myaigist-targets-fargate/7b83cd34f789946f",
+                    "containerName": "myaigist",
+                    "containerPort": 8000
+                }
+            ],
+            "serviceRegistries": [],
+            "status": "ACTIVE",
+            "desiredCount": 2,
+            "runningCount": 0,
+            "pendingCount": 0,
+            "launchType": "FARGATE",
+            "platformVersion": "LATEST",
+            "platformFamily": "Linux",
+            "taskDefinition": "arn:aws:ecs:us-east-1:039357025951:task-definition/myaigist-task:1",
+            "deploymentConfiguration": {
+                "deploymentCircuitBreaker": {
+                    "enable": false,
+                    "rollback": false
+                },
+                "maximumPercent": 200,
+                "minimumHealthyPercent": 100,
+                "strategy": "ROLLING",
+                "bakeTimeInMinutes": 0
+            },
+            "deployments": [
+                {
+                    "id": "ecs-svc/2475378494482453830",
+                    "status": "PRIMARY",
+                    "taskDefinition": "arn:aws:ecs:us-east-1:039357025951:task-definition/myaigist-task:1",
+                    "desiredCount": 1,
+                    "pendingCount": 0,
+                    "runningCount": 0,
+                    "failedTasks": 0,
+                    "createdAt": "2025-08-11T11:08:34.795000-04:00",
+                    "updatedAt": "2025-08-11T11:08:47.260000-04:00",
+                    "launchType": "FARGATE",
+                    "platformVersion": "1.4.0",
+                    "platformFamily": "Linux",
+                    "networkConfiguration": {
+                        "awsvpcConfiguration": {
+                            "subnets": [
+                                "subnet-0bdd4bae7772eedb2",
+                                "subnet-0dc8b0b85fe4ede58"
+                            ],
+                            "securityGroups": [
+                                "sg-0caa49cab12481fe9"
+                            ],
+                            "assignPublicIp": "ENABLED"
+                        }
+                    },
+                    "rolloutState": "IN_PROGRESS",
+                    "rolloutStateReason": "ECS deployment ecs-svc/2475378494482453830 in progress."
+                }
+            ],
+            "roleArn": "arn:aws:iam::039357025951:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS",
+            "events": [
+                {
+                    "id": "fe3024fe-fe17-4446-8a10-2376993d4ba1",
+                    "createdAt": "2025-08-11T11:08:48.207000-04:00",
+                    "message": "(service myaigist-service) failed to launch a task with (error ECS was unable to assume the role 'arn:aws:iam::039357025951:role/ecsTaskRole' that was provided for this task. Please verify that the role being passed has the proper trust relationship and permissions and that your IAM user has permissions to pass this role.)."
+                }
+            ],
+            "createdAt": "2025-08-11T11:08:34.795000-04:00",
+            "placementConstraints": [],
+            "placementStrategy": [],
+            "networkConfiguration": {
+                "awsvpcConfiguration": {
+                    "subnets": [
+                        "subnet-0bdd4bae7772eedb2",
+                        "subnet-0dc8b0b85fe4ede58"
+                    ],
+                    "securityGroups": [
+                        "sg-0caa49cab12481fe9"
+                    ],
+                    "assignPublicIp": "ENABLED"
+                }
+            },
+            "healthCheckGracePeriodSeconds": 0,
+            "schedulingStrategy": "REPLICA",
+            "deploymentController": {
+                "type": "ECS"
+            },
+            "createdBy": "arn:aws:iam::039357025951:user/terraform-admin",
+            "enableECSManagedTags": false,
+            "propagateTags": "NONE",
+            "enableExecuteCommand": false,
+            "availabilityZoneRebalancing": "DISABLED"
+        }
+    ],
+    "failures": []
+}

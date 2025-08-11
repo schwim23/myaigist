@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, session
 from werkzeug.utils import secure_filename
 import os
 from dotenv import load_dotenv
 import uuid
+import secrets
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +26,7 @@ app = Flask(__name__,
 
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(16))
 
 # Ensure directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -60,12 +62,62 @@ try:
 except Exception as e:
     print(f"❌ Error initializing QAAgent: {e}")
 
-# Check if all required agents are available
-all_agents_ready = all([doc_processor, summarizer, transcriber, qa_agent])
+# Check if all required agents are available (except qa_agent which is now session-based)
+all_agents_ready = all([doc_processor, summarizer, transcriber])
 if all_agents_ready:
-    print("✅ All agents initialized successfully")
+    print("✅ All core agents initialized successfully")
 else:
-    print("⚠️  Some agents failed to initialize - some features may not work")
+    print("⚠️  Some core agents failed to initialize - some features may not work")
+
+# Session-based QA agent management
+def get_session_qa_agent():
+    """Get or create a QA agent for the current session"""
+    if 'session_id' not in session:
+        session['session_id'] = secrets.token_hex(8)
+        print(f"🆔 Created new session: {session['session_id']}")
+    
+    session_id = session['session_id']
+    
+    try:
+        # Import here to avoid circular imports
+        from agents.qa_agent import QAAgent
+        
+        # Create session-specific QA agent with custom vector store path
+        qa = QAAgent(session_id=session_id)
+        print(f"✅ QA Agent ready for session: {session_id}")
+        return qa
+    except Exception as e:
+        print(f"❌ Error creating session QA agent: {e}")
+        return None
+
+def cleanup_old_sessions(max_age_hours=24):
+    """Clean up old session vector store files"""
+    try:
+        import glob
+        import time
+        
+        data_dir = 'data'
+        if not os.path.exists(data_dir):
+            return
+            
+        pattern = os.path.join(data_dir, 'vector_store_*.pkl')
+        current_time = time.time()
+        max_age_seconds = max_age_hours * 3600
+        
+        for file_path in glob.glob(pattern):
+            file_age = current_time - os.path.getmtime(file_path)
+            if file_age > max_age_seconds:
+                try:
+                    os.remove(file_path)
+                    print(f"🧹 Cleaned up old session file: {file_path}")
+                except OSError as e:
+                    print(f"⚠️  Failed to cleanup {file_path}: {e}")
+                    
+    except Exception as e:
+        print(f"❌ Error in session cleanup: {e}")
+
+# Clean up old sessions on startup
+cleanup_old_sessions()
 
 @app.route('/')
 def index():
@@ -126,19 +178,20 @@ def process_content():
                     except Exception as e:
                         print(f"⚠️  Audio generation failed: {e}")
                 
-                # Store for QA if agent is available - WITH DEBUGGING
+                # Store for QA with session-based agent - WITH DEBUGGING
                 qa_success = False
-                if qa_agent:
+                session_qa = get_session_qa_agent()
+                if session_qa:
                     try:
                         print(f"💾 Storing text for Q&A (length: {len(text)})")
-                        qa_success = qa_agent.add_document(text, 'User Text Input')
+                        qa_success = session_qa.add_document(text, 'User Text Input')
                         print(f"✅ QA storage result: {qa_success}")
                         
                         # Vector store automatically saves after adding documents
                         print("✅ Document processed and vectors stored")
                         
                         # Verify storage worked
-                        status = qa_agent.get_status()
+                        status = session_qa.get_status()
                         print(f"📊 QA Status after storage: {status}")
                         
                     except Exception as e:
@@ -200,19 +253,20 @@ def process_content():
                     except Exception as e:
                         print(f"⚠️  Audio generation failed: {e}")
                 
-                # Store for QA if agent is available - WITH DEBUGGING
+                # Store for QA with session-based agent - WITH DEBUGGING
                 qa_success = False
-                if qa_agent:
+                session_qa = get_session_qa_agent()
+                if session_qa:
                     try:
                         print(f"💾 Storing document '{filename}' for Q&A (length: {len(text)})")
-                        qa_success = qa_agent.add_document(text, filename)
+                        qa_success = session_qa.add_document(text, filename)
                         print(f"✅ QA storage result: {qa_success}")
                         
                         # Vector store automatically saves after adding documents
                         print("✅ Document processed and vectors stored")
                         
                         # Verify storage worked
-                        status = qa_agent.get_status()
+                        status = session_qa.get_status()
                         print(f"📊 QA Status after storage: {status}")
                         
                     except Exception as e:
@@ -242,8 +296,9 @@ def process_content():
 @app.route('/api/ask-question', methods=['POST'])
 def ask_question():
     """Handle Q&A requests"""
-    # Check if QA agent is available
-    if not qa_agent:
+    # Get session-based QA agent
+    session_qa = get_session_qa_agent()
+    if not session_qa:
         return jsonify({'error': 'Q&A agent not available. Please check server logs.'}), 500
     
     try:
@@ -255,7 +310,7 @@ def ask_question():
         print(f"❓ Processing question: {question[:50]}...")
         
         # Debug QA agent status before answering
-        status = qa_agent.get_status()
+        status = session_qa.get_status()
         print(f"📊 QA Agent Status: {status}")
         
         if not status.get('ready_for_questions', False):
@@ -265,7 +320,7 @@ def ask_question():
             }), 400
         
         # Get answer from QA agent
-        answer = qa_agent.answer_question(question)
+        answer = session_qa.answer_question(question)
         
         # Generate audio for answer if transcriber is available
         audio_url = None
@@ -340,7 +395,7 @@ def debug():
         'document_processor': doc_processor is not None,
         'summarizer': summarizer is not None,
         'transcriber': transcriber is not None,
-        'qa_agent': qa_agent is not None,
+        'qa_agent_session_based': True,  # Always True since we create on-demand
         'all_agents_ready': all_agents_ready
     }
     
@@ -354,7 +409,7 @@ def debug():
     qa_status = {}
     if qa_agent:
         try:
-            qa_status = qa_agent.get_status()
+            qa_status = session_qa.get_status()
         except Exception as e:
             qa_status = {'error': str(e)}
     
@@ -369,11 +424,12 @@ def debug():
 @app.route('/api/qa-debug', methods=['GET'])
 def qa_debug():
     """Specific debugging endpoint for Q&A functionality"""
-    if not qa_agent:
+    session_qa = get_session_qa_agent()
+    if not session_qa:
         return jsonify({'error': 'QA agent not initialized'}), 500
     
     try:
-        status = qa_agent.get_status()
+        status = session_qa.get_status()
         return jsonify({
             'qa_agent_status': status,
             'ready_for_questions': status.get('ready_for_questions', False),
@@ -386,13 +442,14 @@ def qa_debug():
 @app.route('/api/test-question', methods=['POST'])
 def test_question():
     """Test endpoint for Q&A debugging"""
-    if not qa_agent:
+    session_qa = get_session_qa_agent()
+    if not session_qa:
         return jsonify({'error': 'QA agent not initialized'}), 500
     
     try:
         # Test with a simple question
-        test_answer = qa_agent.answer_question("What is this document about?")
-        status = qa_agent.get_status()
+        test_answer = session_qa.answer_question("What is this document about?")
+        status = session_qa.get_status()
         
         return jsonify({
             'test_answer': test_answer,
@@ -428,16 +485,16 @@ def full_test():
         # Step 2: Test QA storage
         if qa_agent:
             try:
-                stored = qa_agent.add_document(test_text, "Test Document")
+                stored = session_qa.add_document(test_text, "Test Document")
                 results['step2_qa_storage'] = stored
-                results['qa_status_after_storage'] = qa_agent.get_status()
+                results['qa_status_after_storage'] = session_qa.get_status()
             except Exception as e:
                 results['errors'].append(f"QA storage error: {e}")
         
         # Step 3: Test QA retrieval
         if qa_agent:
             try:
-                context = qa_agent._get_relevant_context("What is this about?")
+                context = session_qa._get_relevant_context("What is this about?")
                 results['step3_qa_retrieval'] = len(context) > 0
                 results['context_length'] = len(context)
             except Exception as e:
@@ -446,7 +503,7 @@ def full_test():
         # Step 4: Test full Q&A
         if qa_agent:
             try:
-                answer = qa_agent.answer_question("What is this document about?")
+                answer = session_qa.answer_question("What is this document about?")
                 results['step4_qa_answer'] = not answer.startswith("Error") and not answer.startswith("No documents")
                 results['test_answer'] = answer[:200] + "..."
             except Exception as e:
@@ -460,15 +517,16 @@ def full_test():
 @app.route('/api/clear-documents', methods=['POST'])
 def clear_documents():
     """Clear all stored documents from Q&A agent"""
-    if not qa_agent:
+    session_qa = get_session_qa_agent()
+    if not session_qa:
         return jsonify({'error': 'QA agent not available'}), 500
     
     try:
-        qa_agent.clear_documents()
+        session_qa.clear_documents()
         return jsonify({
             'success': True,
             'message': 'All documents cleared',
-            'qa_status': qa_agent.get_status()
+            'qa_status': session_qa.get_status()
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -476,7 +534,8 @@ def clear_documents():
 @app.route('/api/rebuild-vectors', methods=['POST'])
 def rebuild_vectors():
     """Force rebuild QA agent vectors"""
-    if not qa_agent:
+    session_qa = get_session_qa_agent()
+    if not session_qa:
         return jsonify({'error': 'QA agent not available'}), 500
     
     try:
@@ -484,7 +543,7 @@ def rebuild_vectors():
         
         # No need to rebuild vectors - using new vector store with automatic persistence
         print("ℹ️ Vector store uses automatic persistence - no manual rebuild needed")
-        status = qa_agent.get_status()
+        status = session_qa.get_status()
         
         print(f"✅ Vector store status: {status}")
         
@@ -526,13 +585,23 @@ def transcriber_debug():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/cleanup-sessions', methods=['POST'])
+def cleanup_sessions():
+    """Clean up old session files"""
+    try:
+        cleanup_old_sessions()
+        return jsonify({'success': True, 'message': 'Session cleanup completed'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/health')
 def health_check():
     """Simple health check endpoint"""
     return jsonify({
         'status': 'healthy' if all_agents_ready else 'degraded',
         'agents_ready': all_agents_ready,
-        'openai_configured': bool(os.getenv('OPENAI_API_KEY'))
+        'openai_configured': bool(os.getenv('OPENAI_API_KEY')),
+        'session_based_qa': True
     })
 
 if __name__ == '__main__':

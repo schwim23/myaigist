@@ -7,19 +7,27 @@ from .vector_store import VectorStore
 class QAAgent:
     """Agent responsible for question answering using RAG approach"""
     
-    def __init__(self):
-        """Initialize the QA Agent"""
+    def __init__(self, session_id: str = None):
+        """Initialize the QA Agent with optional session-based isolation"""
         try:
             self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
             self.model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+            self.session_id = session_id
             
             # Storage for documents and their metadata
             self.documents = []  # List of {'text': str, 'title': str, 'chunks': List[str]}
             
-            # Initialize vector store for embeddings
-            self.vector_store = VectorStore()
+            # Initialize vector store for embeddings with session-specific path
+            if session_id:
+                vector_store_path = f"data/vector_store_{session_id}.pkl"
+                print(f"🆔 Using session-based vector store: {vector_store_path}")
+            else:
+                vector_store_path = "data/vector_store.pkl"
+                print("⚠️  Using global vector store (not recommended for multi-user)")
+                
+            self.vector_store = VectorStore(persist_path=vector_store_path)
             
-            print("✅ QAAgent initialized successfully")
+            print(f"✅ QAAgent initialized successfully for session: {session_id or 'global'}")
             
         except Exception as e:
             print(f"❌ Error initializing QAAgent: {e}")
