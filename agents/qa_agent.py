@@ -92,12 +92,9 @@ class QAAgent:
             if not question or len(question.strip()) < 3:
                 return "Please provide a valid question."
             
-            # Check if we have any documents
-            if not self.documents:
-                return "No documents have been uploaded yet. Please upload a document first, then ask your question."
-            
+            # Check if we have vectors (this is the real indicator of available content)
             if not self.vector_store.vectors:
-                return "No content available for answering questions. Please upload a document first."
+                return "No documents have been uploaded yet. Please upload a document first, then ask your question."
             
             print(f"❓ Processing question: {question}")
             print(f"📚 Available documents: {len(self.documents)}")
@@ -298,8 +295,19 @@ Please answer the question based on the context provided above."""
     def get_status(self) -> Dict[str, Any]:
         """Get current status of the QA agent"""
         vector_stats = self.vector_store.get_stats()
+        
+        # Count unique documents from vector metadata if documents list is empty
+        unique_docs = set()
+        if self.vector_store.metadata:
+            for metadata in self.vector_store.metadata:
+                if 'title' in metadata:
+                    unique_docs.add(metadata['title'])
+        
+        # Use in-memory count if available, otherwise count from vectors
+        doc_count = len(self.documents) if self.documents else len(unique_docs)
+        
         return {
-            'documents_count': len(self.documents),
+            'documents_count': doc_count,
             'chunks_count': vector_stats['total_vectors'],
             'vectors_ready': vector_stats['total_vectors'] > 0,
             'ready_for_questions': vector_stats['total_vectors'] > 0,
