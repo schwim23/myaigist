@@ -1,10 +1,8 @@
 import os
 from openai import OpenAI
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
 from typing import List, Dict, Any
 import re
+from .vector_store import VectorStore
 
 class QAAgent:
     """Agent responsible for question answering using RAG approach"""
@@ -13,24 +11,13 @@ class QAAgent:
         """Initialize the QA Agent"""
         try:
             self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-            self.model = "gpt-3.5-turbo"
+            self.model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
             
             # Storage for documents and their metadata
             self.documents = []  # List of {'text': str, 'title': str, 'chunks': List[str]}
-            self.all_chunks = []  # All text chunks for searching
-            self.chunk_metadata = []  # Metadata for each chunk (doc_index, chunk_index)
             
-            # TF-IDF components - more lenient configuration
-            self.vectorizer = TfidfVectorizer(
-                max_features=1000,  # Reduced for better matching
-                stop_words='english',
-                ngram_range=(1, 2),  # Include bigrams
-                max_df=0.9,  # Allow more common terms
-                min_df=1,    # Include all terms
-                lowercase=True,
-                strip_accents='unicode'
-            )
-            self.chunk_vectors = None
+            # Initialize vector store for embeddings
+            self.vector_store = VectorStore()
             
             print("✅ QAAgent initialized successfully")
             
@@ -71,17 +58,18 @@ class QAAgent:
             }
             self.documents.append(document)
             
-            # Add chunks to global storage
+            # Add chunks to vector store
             for chunk_index, chunk in enumerate(chunks):
-                self.all_chunks.append(chunk)
-                self.chunk_metadata.append({
+                metadata = {
                     'doc_index': doc_index,
                     'chunk_index': chunk_index,
-                    'title': title
-                })
+                    'title': title,
+                    'doc_title': title
+                }
+                self.vector_store.add_text(chunk, metadata)
             
-            # Rebuild vectors
-            self._rebuild_vectors()
+            # Save vector store
+            self.vector_store.save()
             
             print(f"✅ Added document '{title}' with {len(chunks)} chunks")
             return True
@@ -108,12 +96,12 @@ class QAAgent:
             if not self.documents:
                 return "No documents have been uploaded yet. Please upload a document first, then ask your question."
             
-            if not self.all_chunks:
+            if not self.vector_store.vectors:
                 return "No content available for answering questions. Please upload a document first."
             
             print(f"❓ Processing question: {question}")
             print(f"📚 Available documents: {len(self.documents)}")
-            print(f"📄 Available chunks: {len(self.all_chunks)}")
+            print(f"📄 Available chunks: {len(self.vector_store.vectors)}")
             
             # Get relevant context
             relevant_context = self._get_relevant_context(question)
@@ -180,23 +168,14 @@ class QAAgent:
         
         return chunks
     
-    def _rebuild_vectors(self):
-        """Rebuild TF-IDF vectors for all chunks"""
-        try:
-            if self.all_chunks:
-                self.chunk_vectors = self.vectorizer.fit_transform(self.all_chunks)
-                print(f"🔄 Rebuilt vectors for {len(self.all_chunks)} chunks")
-            else:
-                self.chunk_vectors = None
-                print("⚠️  No chunks available for vectorization")
-                
-        except Exception as e:
-            print(f"❌ Error rebuilding vectors: {e}")
-            self.chunk_vectors = None
+    def _get_vector_stats(self):
+        """Get vector store statistics"""
+        stats = self.vector_store.get_stats()
+        print(f"📊 Vector Store Stats: {stats['total_vectors']} vectors, {stats['dimension']} dims, {stats['memory_usage_mb']:.1f}MB")
     
     def _get_relevant_context(self, question: str, top_k: int = 3) -> str:
         """
-        Get most relevant text chunks for the question
+        Get most relevant text chunks for the question using embedding search
         
         Args:
             question (str): User question
@@ -206,7 +185,7 @@ class QAAgent:
             str: Combined relevant context
         """
         try:
-            if not self.chunk_vectors or not self.all_chunks:
+            if not self.vector_store.vectors:
                 # Fallback: return first part of most recent document
                 if self.documents:
                     latest_doc = self.documents[-1]
@@ -214,51 +193,44 @@ class QAAgent:
                     return latest_doc['text'][:2000]
                 return ""
             
-            print(f"🔍 Searching among {len(self.all_chunks)} chunks for: '{question}'")
+            print(f"🔍 Searching among {len(self.vector_store.vectors)} chunks for: '{question}'")
             
-            # Clean and normalize the question for better matching
-            clean_question = question.lower().strip()
+            # Use vector store similarity search
+            search_results = self.vector_store.similarity_search(
+                query=question,
+                top_k=top_k,
+                min_similarity=0.1  # Lower threshold for better matching
+            )
             
-            # Vectorize the question
-            try:
-                question_vector = self.vectorizer.transform([clean_question])
-            except Exception as e:
-                print(f"❌ Error vectorizing question: {e}")
-                # Fallback to keyword matching
-                return self._keyword_fallback(question)
-            
-            # Calculate similarities
-            similarities = cosine_similarity(question_vector, self.chunk_vectors)[0]
-            
-            print(f"📊 Similarity scores - Max: {max(similarities):.3f}, Min: {min(similarities):.3f}, Mean: {np.mean(similarities):.3f}")
-            
-            # Get top k most similar chunks
-            top_indices = np.argsort(similarities)[-top_k:][::-1]
+            if not search_results:
+                print("⚠️  No similar chunks found, trying with lower threshold")
+                search_results = self.vector_store.similarity_search(
+                    query=question,
+                    top_k=top_k,
+                    min_similarity=0.0  # Try with no threshold
+                )
             
             relevant_chunks = []
-            for i, idx in enumerate(top_indices):
-                similarity_score = similarities[idx]
+            for i, result in enumerate(search_results):
+                similarity_score = result['similarity']
+                metadata = result['metadata']
+                chunk_text = metadata['text']
+                
                 print(f"  🎯 Chunk {i+1}: similarity={similarity_score:.3f}")
                 
-                if similarity_score > 0.05:  # Lower threshold for better matching
-                    chunk = self.all_chunks[idx]
-                    metadata = self.chunk_metadata[idx]
-                    
-                    # Show preview of matched chunk
-                    preview = chunk[:100] + "..." if len(chunk) > 100 else chunk
-                    print(f"    📝 Matched chunk: {preview}")
-                    
-                    relevant_chunks.append(f"[From: {metadata['title']}]\n{chunk}")
+                # Show preview of matched chunk
+                preview = chunk_text[:100] + "..." if len(chunk_text) > 100 else chunk_text
+                print(f"    📝 Matched chunk: {preview}")
+                
+                relevant_chunks.append(f"[From: {metadata['title']}]\n{chunk_text}")
             
             if not relevant_chunks:
-                # If no chunks meet threshold, use the best ones anyway
-                print("⚠️  No chunks met similarity threshold, using best matches")
-                for idx in top_indices:
-                    chunk = self.all_chunks[idx]
-                    metadata = self.chunk_metadata[idx]
-                    relevant_chunks.append(f"[From: {metadata['title']}]\n{chunk}")
-                    if len(relevant_chunks) >= 2:  # At least get 2 chunks
-                        break
+                # Ultimate fallback to most recent document
+                print("⚠️  No chunks found, using fallback")
+                if self.documents:
+                    latest_doc = self.documents[-1]
+                    return latest_doc['text'][:2000]
+                return ""
             
             context = "\n\n---\n\n".join(relevant_chunks)
             print(f"✅ Final context length: {len(context)} characters from {len(relevant_chunks)} chunks")
@@ -276,35 +248,6 @@ class QAAgent:
                 return latest_doc['text'][:2000]
             return ""
     
-    def _keyword_fallback(self, question: str) -> str:
-        """Fallback keyword-based search when TF-IDF fails"""
-        try:
-            question_words = set(question.lower().split())
-            best_chunks = []
-            
-            for i, chunk in enumerate(self.all_chunks):
-                chunk_words = set(chunk.lower().split())
-                overlap = len(question_words & chunk_words)
-                if overlap > 0:
-                    metadata = self.chunk_metadata[i]
-                    best_chunks.append((overlap, chunk, metadata))
-            
-            # Sort by word overlap
-            best_chunks.sort(key=lambda x: x[0], reverse=True)
-            
-            # Take top 3
-            relevant_chunks = []
-            for overlap, chunk, metadata in best_chunks[:3]:
-                print(f"🔤 Keyword match (overlap: {overlap}): {chunk[:50]}...")
-                relevant_chunks.append(f"[From: {metadata['title']}]\n{chunk}")
-            
-            return "\n\n---\n\n".join(relevant_chunks)
-            
-        except Exception as e:
-            print(f"❌ Keyword fallback failed: {e}")
-            if self.documents:
-                return self.documents[-1]['text'][:2000]
-            return ""
     
     def _generate_answer(self, question: str, context: str) -> str:
         """
@@ -354,17 +297,19 @@ Please answer the question based on the context provided above."""
     
     def get_status(self) -> Dict[str, Any]:
         """Get current status of the QA agent"""
+        vector_stats = self.vector_store.get_stats()
         return {
             'documents_count': len(self.documents),
-            'chunks_count': len(self.all_chunks),
-            'vectors_ready': self.chunk_vectors is not None,
-            'ready_for_questions': len(self.all_chunks) > 0
+            'chunks_count': vector_stats['total_vectors'],
+            'vectors_ready': vector_stats['total_vectors'] > 0,
+            'ready_for_questions': vector_stats['total_vectors'] > 0,
+            'embedding_dimension': vector_stats['dimension'],
+            'memory_usage_mb': vector_stats['memory_usage_mb']
         }
     
     def clear_documents(self):
         """Clear all stored documents"""
         self.documents = []
-        self.all_chunks = []
-        self.chunk_metadata = []
-        self.chunk_vectors = None
-        print("🗑️  Cleared all documents")
+        self.vector_store.clear()
+        self.vector_store.save()  # Save cleared state
+        print("🗑️  Cleared all documents and vectors")

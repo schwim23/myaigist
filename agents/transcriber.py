@@ -53,7 +53,7 @@ class Transcriber:
             # Transcribe using OpenAI Whisper
             with open(audio_file_path, 'rb') as audio_file:
                 transcript = self.client.audio.transcriptions.create(
-                    model="whisper-1",
+                    model=os.getenv('OPENAI_WHISPER_MODEL', 'whisper-1'),
                     file=audio_file,
                     response_format="text"
                 )
@@ -102,7 +102,7 @@ class Transcriber:
             
             # Generate speech
             response = self.client.audio.speech.create(
-                model="tts-1",
+                model=os.getenv('OPENAI_TTS_MODEL', 'tts-1'),
                 voice=voice,
                 input=text,
                 response_format="mp3"

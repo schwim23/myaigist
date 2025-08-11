@@ -1,41 +1,60 @@
 # 🧠 MyAIGist - AI-Powered Content Analysis & Q&A
 
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Flask](https://img.shields.io/badge/flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
-[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-success.svg)](https://openai.com/)
+[![Flask](https://img.shields.io/badge/flask-2.2+-green.svg)](https://flask.palletsprojects.com/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-success.svg)](https://openai.com/)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**MyAIGist** is a lightweight, intelligent AI-powered assistant that transforms any content into an interactive Q&A experience. Upload documents or paste text to get instant summaries with three detail levels and ask detailed questions using text or voice input.
+**MyAIGist** is an intelligent AI-powered assistant that transforms any content into an interactive Q&A experience using **real semantic search with OpenAI embeddings**. Upload documents or paste text to get instant multi-level summaries and ask detailed questions using text or voice input with Google Analytics tracking.
 
 ![MyAIGist Demo](https://via.placeholder.com/800x400/667eea/ffffff?text=MyAIGist+Demo+Screenshot)
 
 ---
 
-## ✨ Features
+## ✨ Latest Features (v2.0)
 
-### 📄 **Content Input**
+### 🎯 **Real Semantic Search & RAG**
+- **OpenAI Embeddings**: True semantic understanding with `text-embedding-3-small`
+- **Vector Store**: Container-friendly persistence with numpy + pickle
+- **Advanced RAG**: Retrieval-Augmented Generation with cosine similarity
+- **Smart Chunking**: Intelligent text segmentation for better context retrieval
+
+### 📄 **Content Input & Processing**
 - **Text Input**: Direct text analysis and processing
 - **Document Upload**: PDF, DOCX, TXT files with intelligent parsing
+- **Smart Parsing**: Extracts clean text from complex document formats
 
 ### 🎯 **Three-Level AI Summaries**
-- **⚡ Quick**: 2-3 key bullet points for fast overview
-- **📄 Standard**: Balanced summary with main topics and details (default)
-- **📚 Detailed**: Comprehensive analysis with context, insights, and implications
+- **⚡ Quick**: 2-3 key bullet points (300 tokens) for fast overview
+- **📄 Standard**: Balanced summary with main topics (600 tokens) - default
+- **📚 Detailed**: Comprehensive analysis with insights (1200 tokens)
 
-### 💬 **Intelligent Q&A System**
-- **Text Questions**: Type questions naturally
-- **🎤 Voice Questions**: Live audio recording with browser microphone
-- **RAG-Enhanced Answers**: Retrieval-Augmented Generation for accurate responses
-- **Audio Responses**: Text-to-speech for accessibility
+### 💬 **Advanced Q&A System**
+- **Semantic Search**: Find relevant content using meaning, not just keywords
+- **Context-Aware**: Retrieves most relevant document chunks for answers
+- **Text & Voice**: Type questions or use microphone recording
+- **Audio Responses**: Text-to-speech with configurable voices
 
 ### 🔊 **Voice Features**
-- **Live Voice Recording**: Browser-based microphone recording for questions
-- **Auto-Transcription**: Convert speech to text automatically
-- **Audio Responses**: Listen to answers with text-to-speech
-- **WebM Support**: Handles browser recordings with ffmpeg conversion
+- **Live Recording**: Browser-based microphone with real-time feedback
+- **Auto-Transcription**: Whisper model converts speech to text
+- **Audio Playback**: Listen to generated answers with TTS
+- **Multiple Voices**: Choose from 6 different AI voices
+
+### 📊 **Analytics & Tracking**
+- **Google Analytics**: Track website visits and user interactions
+- **Event Tracking**: Monitor content summarization and question events
+- **Performance Metrics**: Response times and usage statistics
+
+### 🐳 **Container & Cloud Ready**
+- **Docker Support**: Full containerization with health checks
+- **Docker Compose**: One-command deployment setup  
+- **AWS Fargate Ready**: Optimized for serverless container deployment
+- **Persistent Storage**: Vector embeddings survive container restarts
 
 ### 🎨 **Modern Interface**
-- **Responsive Design**: Works perfectly on desktop and mobile
+- **Responsive Design**: Perfect on desktop, tablet, and mobile
 - **Dark Theme**: Beautiful gradient design with glassmorphism
 - **Real-time Feedback**: Progress indicators and status updates
 - **Smooth Animations**: Professional micro-interactions
@@ -48,6 +67,7 @@
 - Python 3.11+ 
 - OpenAI API key
 - FFmpeg (optional, for better audio processing)
+- Docker (optional, for containerized deployment)
 
 ### 1. Clone Repository
 ```bash
@@ -55,123 +75,94 @@ git clone https://github.com/yourusername/myaigist.git
 cd myaigist
 ```
 
-### 2. Install Dependencies
+### 2. Environment Setup
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env file with your keys
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_EMBED_MODEL=text-embedding-3-small
+OPENAI_TTS_MODEL=tts-1
+OPENAI_WHISPER_MODEL=whisper-1
+GA_MEASUREMENT_ID=G-XXXXXXXXX  # optional
+```
+
+### 3. Installation Options
+
+#### Option A: Standard Python Installation
 ```bash
 # Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install requirements
+# Install dependencies
 pip install -r requirements.txt
-```
 
-### 3. Environment Setup
-```bash
-# Create .env file
-cp .env.example .env
-
-# Add your OpenAI API key
-echo "OPENAI_API_KEY=your_openai_api_key_here" > .env
-```
-
-### 4. Run Application
-```bash
+# Run application
 python main.py
+```
+
+#### Option B: Docker Deployment (Recommended)
+```bash
+# Build and run with Docker Compose
+docker-compose up --build
+
+# Or build manually
+docker build -t myaigist .
+docker run -p 8000:8000 --env-file .env myaigist
 ```
 
 🎉 **Visit**: [http://localhost:8000](http://localhost:8000)
 
 ---
 
-## 📦 Installation Options
-
-### Option 1: Standard Installation
-```bash
-pip install -r requirements.txt
-```
-
-### Option 2: With FFmpeg (Recommended for voice features)
-**macOS:**
-```bash
-brew install ffmpeg
-pip install -r requirements.txt
-```
-
-**Ubuntu/Debian:**
-```bash
-sudo apt update && sudo apt install ffmpeg
-pip install -r requirements.txt
-```
-
-**Windows:**
-Download FFmpeg from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH.
-
----
-
 ## 🏗 Architecture
 
-### **Agent-Based Design**
+### **AI Agent System**
 - **DocumentProcessor**: Extracts text from PDF, DOCX, TXT files
-- **Summarizer**: Multi-level AI summarization with OpenAI GPT
-- **Transcriber**: Live audio transcription (Whisper) and text-to-speech
-- **QAAgent**: RAG-powered question answering with semantic search
+- **Summarizer**: Multi-level AI summarization with configurable models
+- **VectorStore**: Semantic embeddings with persistence for containers
+- **Embedder**: OpenAI embedding generation with batch support
+- **Transcriber**: Audio transcription (Whisper) and text-to-speech
+- **QAAgent**: RAG-powered Q&A with semantic similarity search
 
 ### **Tech Stack**
-- **Backend**: Flask (Python web framework)
-- **Frontend**: Vanilla JavaScript with AJAX
-- **AI/ML**: OpenAI (GPT-4, GPT-3.5, Whisper, TTS)
-- **Vector Search**: Scikit-learn cosine similarity
+- **Backend**: Flask (Python web framework) with Gunicorn
+- **AI/ML**: OpenAI (GPT-4o-mini, Whisper, TTS, Embeddings)
+- **Vector Search**: OpenAI embeddings + numpy cosine similarity
 - **Audio**: Web Audio API + MediaRecorder
-- **Styling**: Modern CSS with responsive design
+- **Analytics**: Google Analytics 4 with event tracking
+- **Deployment**: Docker + Docker Compose + AWS Fargate ready
+- **Frontend**: Vanilla JavaScript with modern CSS
 
-### **Project Structure**
+### **Updated Project Structure**
 ```
 myaigist/
 ├── main.py                    # Flask server with API routes
 ├── requirements.txt           # Python dependencies
+├── Dockerfile                 # Container configuration
+├── docker-compose.yml         # Multi-service deployment
 ├── .env                      # Environment variables
 ├── templates/
-│   └── index.html            # Main application interface
+│   └── index.html            # Main app with Google Analytics
 ├── static/
 │   ├── css/styles.css        # Responsive styling
-│   ├── js/app.js            # Frontend JavaScript
-│   └── audio/               # Generated audio files
+│   ├── js/app.js            # Frontend with GA tracking
+│   └── audio/               # Generated TTS audio files
 ├── agents/                   # AI agent modules
+│   ├── openai_client.py     # Centralized OpenAI client
 │   ├── document_processor.py # Document text extraction
 │   ├── summarizer.py        # Multi-level summarization
-│   ├── transcriber.py       # Audio processing
-│   └── qa_agent.py          # RAG Q&A system
+│   ├── embeddings.py        # OpenAI embedding generation
+│   ├── vector_store.py      # Container-friendly vector storage
+│   ├── transcriber.py       # Audio processing (Whisper/TTS)
+│   ├── tts.py               # Text-to-speech agent
+│   └── qa_agent.py          # Semantic RAG Q&A system
+├── data/                     # Persistent vector storage
+│   └── vector_store.pkl     # Embedding persistence
 └── uploads/                  # Temporary file storage
-```
-
----
-
-## 🎯 Usage Examples
-
-### 1. **Document Analysis**
-```bash
-1. Upload a PDF research paper
-2. Select "Detailed" summary level
-3. Get comprehensive analysis with insights
-4. Ask: "What are the main findings?"
-5. Get intelligent answer with source attribution
-```
-
-### 2. **Voice-Powered Q&A**
-```bash
-1. Paste article text
-2. Use "Standard" summary (default)
-3. Click microphone button
-4. Ask question verbally: "What are the implications?"
-5. Get both text and audio response
-```
-
-### 3. **Text Document Processing**
-```bash
-1. Upload Word document or PDF
-2. Get "Quick" summary of key points
-3. Ask: "What decisions were made?"
-4. Use voice or text to ask follow-up questions
 ```
 
 ---
@@ -180,70 +171,151 @@ myaigist/
 
 ### **Environment Variables (.env)**
 ```bash
-# Required
+# Required - OpenAI Configuration
 OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4o-mini                    # Chat model
+OPENAI_EMBED_MODEL=text-embedding-3-small  # Embedding model  
+OPENAI_TTS_MODEL=tts-1                      # Text-to-speech model
+OPENAI_WHISPER_MODEL=whisper-1              # Speech-to-text model
 
-# Optional
-FLASK_ENV=development
-FLASK_DEBUG=true
-MAX_CONTENT_LENGTH=52428800  # 50MB
+# Optional - Analytics & Monitoring  
+GA_MEASUREMENT_ID=G-XXXXXXXXX               # Google Analytics
+AWS_REGION=us-east-1                        # CloudWatch region
+CW_LOG_GROUP=/myaigist/llm                  # CloudWatch logs
+
+# Optional - Flask Configuration
+FLASK_ENV=production
+FLASK_DEBUG=false
+MAX_CONTENT_LENGTH=52428800                 # 50MB file limit
 ```
 
-### **Summary Levels**
-Customize in `agents/summarizer.py`:
-```python
-# Quick: 2-3 bullet points, 300 tokens
-# Standard: 4-5 key points, 600 tokens  
-# Detailed: 6+ sections, 1200 tokens
-```
+### **Model Configuration**
+All AI models are now configurable via environment variables:
+- **Chat Model**: `gpt-4o-mini` (configurable)
+- **Embeddings**: `text-embedding-3-small` (1536 dimensions)  
+- **Voice**: 6 different TTS voices available
+- **Transcription**: Whisper model for speech-to-text
 
-### **Audio Settings**
-Configure in `agents/transcriber.py`:
+### **Vector Store Settings**
 ```python
-# Whisper model: whisper-1
-# TTS voice: nova (alloy, echo, fable, onyx, shimmer)
-# Audio format: MP3, WebM support
+# Container-friendly persistence
+VECTOR_STORE_PATH = "data/vector_store.pkl"
+SIMILARITY_THRESHOLD = 0.1  # Minimum semantic similarity
+TOP_K_CHUNKS = 3           # Number of chunks per query
 ```
 
 ---
 
-## 🚀 Deployment
+## 🐳 Docker Deployment
 
-### **Local Development**
+### **Docker Compose (Recommended)**
+```yaml
+# docker-compose.yml
+services:
+  myaigist:
+    build: .
+    container_name: myaigist-app
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+      - OPENAI_EMBED_MODEL=${OPENAI_EMBED_MODEL}
+      - GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+### **AWS Fargate Deployment**
+The application is optimized for serverless container deployment:
+
+1. **Build and push to ECR**:
 ```bash
-python main.py  # Runs on http://localhost:8000
+# Build for production
+docker build -t myaigist .
+
+# Tag for ECR
+docker tag myaigist:latest your-account.dkr.ecr.region.amazonaws.com/myaigist:latest
+
+# Push to ECR
+docker push your-account.dkr.ecr.region.amazonaws.com/myaigist:latest
 ```
 
-### **Production Deployment**
+2. **Deploy to Fargate**:
+- Uses persistent EFS storage for vector embeddings
+- Environment variables managed through ECS task definition
+- Auto-scaling based on CPU/memory usage
+- Health checks with automatic container replacement
 
-#### **Option 1: Simple Production Server**
+---
+
+## 📊 Analytics & Tracking
+
+### **Google Analytics Integration**
+The application now includes comprehensive analytics:
+
+```javascript
+// Automatic tracking
+- Page views and session duration
+- Content summarization events (with detail level)
+- Question asking events (with question length)
+- Audio feature usage
+- Error events and user interactions
+```
+
+### **Event Examples**
+```javascript
+// Content summarized
+gtag('event', 'content_summarized', {
+  content_type: 'text|file',
+  summary_level: 'quick|standard|detailed',
+  has_audio: true|false
+});
+
+// Question asked  
+gtag('event', 'question_asked', {
+  question_length: 42,
+  has_audio_response: true|false
+});
+```
+
+---
+
+## 🎯 Usage Examples
+
+### 1. **Document Analysis with Semantic Search**
 ```bash
-# Install production WSGI server
-pip install gunicorn
-
-# Run with Gunicorn
-gunicorn --bind 0.0.0.0:8000 main:app
+1. Upload a PDF research paper (up to 50MB)
+2. Select "Detailed" summary level  
+3. Get comprehensive analysis with semantic understanding
+4. Ask: "What methodology was used?"
+5. Get precise answers from most relevant document sections
 ```
 
-#### **Option 2: Docker Deployment**
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-EXPOSE 8000
-
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "main:app"]
+### 2. **Voice-Powered Q&A**
+```bash
+1. Paste article text or upload document
+2. Use "Standard" summary (default)
+3. Click microphone button and ask: "What are the implications?"
+4. Get both text and audio response with source attribution
+5. All interactions tracked in Google Analytics
 ```
 
-#### **Option 3: Cloud Deployment (AWS/GCP/Azure)**
-1. Set environment variables in cloud console
-2. Deploy using cloud-specific Python app services
-3. Configure domain and SSL certificates
-4. Set up file storage for uploads
+### 3. **Container-Based Deployment**
+```bash
+1. Set environment variables in .env file
+2. Run: docker-compose up --build
+3. Application starts with persistent vector storage
+4. Upload documents - embeddings survive container restarts
+5. Scale horizontally with load balancer
+```
 
 ---
 
@@ -259,150 +331,128 @@ Content-Type: application/json
   "text": "Your content here",
   "summary_level": "standard"  // quick, standard, detailed
 }
-```
 
-### **Ask Question**
-```http
-POST /api/ask-question
-Content-Type: application/json
-
+Response:
 {
-  "question": "What are the main points?"
+  "success": true,
+  "summary": "Generated summary...",
+  "audio_url": "/static/audio/speech_123.mp3",
+  "qa_stored": true,
+  "embedding_stats": {
+    "chunks_created": 5,
+    "vectors_stored": 5
+  }
 }
 ```
 
-### **Transcribe Audio (Q&A Voice Recording Only)**
+### **Ask Question (Semantic RAG)**
+```http
+POST /api/ask-question  
+Content-Type: application/json
+
+{
+  "question": "What are the main findings?"
+}
+
+Response:
+{
+  "success": true,
+  "answer": "Based on the document analysis...",
+  "audio_url": "/static/audio/answer_456.mp3", 
+  "sources": [
+    {
+      "similarity": 0.89,
+      "text_preview": "The study found that...",
+      "document_title": "Research Paper"
+    }
+  ]
+}
+```
+
+### **Transcribe Audio**
 ```http
 POST /api/transcribe-audio
 Content-Type: multipart/form-data
 
 file: <recorded_audio_blob>
+
+Response:
+{
+  "success": true,
+  "transcription": "What are the key insights from this document?"
+}
 ```
 
 ---
 
-## 🧪 Testing
+## 🧪 Testing & Development
 
-### **Run Basic Tests**
+### **Run Tests**
 ```bash
-# Test API endpoints
+# Test semantic search
 curl -X POST http://localhost:8000/api/process-content \
   -H "Content-Type: application/json" \
-  -d '{"type":"text","text":"Test content","summary_level":"quick"}'
+  -d '{"type":"text","text":"AI will transform how we work by automating routine tasks","summary_level":"quick"}'
 
-# Test file upload
-curl -X POST http://localhost:8000/api/process-content \
-  -F "file=@document.pdf" \
-  -F "type=file" \
-  -F "summary_level=standard"
+# Test embedding-based Q&A
+curl -X POST http://localhost:8000/api/ask-question \
+  -H "Content-Type: application/json" \
+  -d '{"question":"How will AI change work?"}'
 ```
 
-### **Browser Compatibility**
-- ✅ Chrome 80+
-- ✅ Firefox 70+  
-- ✅ Safari 13+
-- ✅ Edge 80+
-
-**Note**: Microphone features require HTTPS in production.
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how to get started:
-
-### **Development Setup**
+### **Vector Store Debugging**
 ```bash
-git clone https://github.com/yourusername/myaigist.git
-cd myaigist
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+# Check vector store status
+GET /api/status
 
-### **Code Style**
-- Follow PEP 8 for Python code
-- Use meaningful variable names and docstrings
-- Add comments for complex logic
-- Test with multiple file types and browsers
-
-### **Pull Request Process**
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes with tests
-4. Commit: `git commit -m 'Add amazing feature'`
-5. Push: `git push origin feature/amazing-feature`
-6. Open a Pull Request
-
----
-
-## 🐛 Troubleshooting
-
-### **Common Issues**
-
-#### **Microphone Not Working**
-```bash
-# Check browser permissions
-# Chrome: Settings > Privacy > Microphone
-# Firefox: about:preferences#privacy
-
-# Test microphone access
-navigator.mediaDevices.getUserMedia({audio:true})
-```
-
-#### **Voice Transcription Fails**
-```bash
-# Install/check FFmpeg (optional but recommended)
-ffmpeg -version
-
-# macOS: brew install ffmpeg
-# Ubuntu: sudo apt install ffmpeg
-```
-
-#### **OpenAI API Errors**
-```bash
-# Verify API key in .env file
-echo $OPENAI_API_KEY
-
-# Check API usage at: https://platform.openai.com/usage
-# Ensure sufficient credits and correct permissions
-```
-
-#### **File Upload Issues**
-```bash
-# Check file size (50MB limit)
-# Supported formats: PDF, DOCX, TXT
-# Verify upload directory permissions
-```
-
-### **Debug Mode**
-```bash
-# Enable debug logging
-export FLASK_DEBUG=true
-python main.py
-
-# Check debug endpoint
-curl http://localhost:8000/debug
+# Response includes embedding statistics
+{
+  "documents_count": 3,
+  "chunks_count": 15,
+  "embedding_dimension": 1536,
+  "memory_usage_mb": 2.4
+}
 ```
 
 ---
 
-## 📊 Performance
+## 🚀 Performance & Scaling
 
 ### **Response Times** (typical)
-- Text processing: 2-5 seconds
-- Document processing: 3-10 seconds (depends on size)
-- Q&A responses: 2-8 seconds
-- Voice recording: Real-time
+- Text processing with embeddings: 3-8 seconds
+- Document processing: 5-15 seconds (depends on size and chunks)
+- Semantic Q&A: 2-6 seconds
+- Voice transcription: 1-3 seconds
 
-### **Supported File Sizes**
-- Documents: Up to 50MB
-- Text input: Up to 50,000 characters
+### **Memory Usage**
+- Base application: ~150MB
+- Vector storage: ~1-2MB per 1000 document chunks
+- Audio files: Auto-cleanup after 24 hours
 
-### **Optimization Tips**
-- Use "Quick" summaries for faster processing
-- Keep voice recordings short for better transcription
-- Use supported file formats for better performance
+### **Container Scaling**
+```yaml
+# ECS Service Configuration
+cpu: 512      # 0.5 vCPU
+memory: 1024  # 1GB RAM
+min_capacity: 1
+max_capacity: 10
+target_cpu_utilization: 70%
+```
+
+---
+
+## 🔒 Security & Privacy
+
+### **Data Handling**
+- Documents processed in-memory, deleted after processing
+- Embeddings stored locally (no external vector database)
+- Audio files auto-deleted after 24 hours
+- No user data sent to third-parties except OpenAI API
+
+### **API Security**
+- CORS configured for production domains
+- File upload validation and size limits
+- Input sanitization for all user content
 
 ---
 
@@ -414,11 +464,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🌟 Acknowledgments
 
-- **OpenAI** for providing powerful language models and APIs
+- **OpenAI** for providing powerful language models, embeddings, and APIs
 - **Flask** for the excellent Python web framework  
-- **Web Audio API** for browser-based audio recording
-- **Scikit-learn** for efficient vector similarity search
-- **FFmpeg** for robust audio processing
+- **Google Analytics** for comprehensive user behavior tracking
+- **Docker** for containerization and deployment flexibility
+- **NumPy** for efficient vector operations and similarity calculations
 - **Modern CSS** community for design inspiration
 
 ---
@@ -434,32 +484,31 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🚀 Roadmap
 
-### **Current Version: v1.0**
-- ✅ Text and document input
-- ✅ Three-level AI summaries  
-- ✅ Voice recording for questions
-- ✅ RAG-powered Q&A
-- ✅ Modern responsive UI
+### **Current Version: v2.0** ✅
+- ✅ Real semantic search with OpenAI embeddings
+- ✅ Container-ready vector storage with persistence
+- ✅ Configurable AI models via environment variables  
+- ✅ Google Analytics integration with event tracking
+- ✅ Docker + Docker Compose deployment
+- ✅ AWS Fargate optimization
 
-### **Upcoming Features**
+### **Upcoming Features: v2.1** 🔄
 - 🔄 Streaming responses for real-time text generation
-- 📤 Export summaries and Q&A sessions to PDF/Markdown
-- 🔗 Share processed content with others
-- 🎥 YouTube URL integration for video analysis
-- 📊 Analytics dashboard for usage insights
-- 💾 Session save/restore functionality
-- 🌐 Multi-language support
-- 🔌 REST API for third-party integrations
+- 🔄 Multiple document collections and management
+- 🔄 Enhanced analytics dashboard 
+- 🔄 API rate limiting and authentication
+- 🔄 Batch document processing
 
-### **Future Enhancements**
-- 💬 Multi-document collection analysis
-- 🤖 Custom AI model fine-tuning
-- ☁️ Cloud storage integration
-- 🔒 Enterprise authentication (SSO)
-- 📱 Native mobile apps
+### **Future Enhancements: v3.0** 🔮
+- 💬 Multi-document cross-referencing and analysis
+- 🤖 Custom embedding models and fine-tuning
+- ☁️ S3/MinIO integration for large file storage
+- 🔒 Enterprise SSO and user management
+- 📱 Progressive Web App (PWA) support
+- 🌐 Multi-language document processing
 
 ---
 
-**⭐ If MyAIGist helps you work smarter, please star the repository and share it with others!**
+**⭐ If MyAIGist helps you work smarter with true semantic understanding, please star the repository and share it with others!**
 
-*Built with ❤️ for researchers, professionals, and anyone who wants to have intelligent conversations with their content.*
+*Built with ❤️ for researchers, professionals, and anyone who wants to have intelligent conversations with their content using real AI embeddings.*

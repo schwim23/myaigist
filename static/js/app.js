@@ -26,6 +26,14 @@ class MyAIGist {
         console.log('🧩 Methods on instance:', protoMethods);
     }
 
+    // Google Analytics event tracking helper
+    trackEvent(eventName, parameters = {}) {
+        if (typeof window.gtag === 'function') {
+            window.gtag('event', eventName, parameters);
+            console.log('📊 GA Event tracked:', eventName, parameters);
+        }
+    }
+
     setupEventListeners() {
         // Content processing
         const processBtn = document.getElementById('process-btn');
@@ -420,6 +428,13 @@ class MyAIGist {
 
             if (result.success) {
                 this.showSummary(result.summary, result.audio_url, this.selectedSummaryLevel);
+                
+                // Track summarization event
+                this.trackEvent('content_summarized', {
+                    content_type: activeTab,
+                    summary_level: this.selectedSummaryLevel,
+                    has_audio: !!result.audio_url
+                });
                 this.showQASection();
                 this.showStatus(`Content processed successfully with ${levelNames[this.selectedSummaryLevel]} summary! You can now ask questions.`, 'success');
                 console.log('✅ Content processed successfully, QA stored:', result.qa_stored);
@@ -485,6 +500,12 @@ class MyAIGist {
             const result = await response.json();
             if (result.success && result.answer) {
                 this.showAnswer(result.answer, result.audio_url);
+                
+                // Track question asking event
+                this.trackEvent('question_asked', {
+                    question_length: questionText.length,
+                    has_audio_response: !!result.audio_url
+                });
                 const q = document.getElementById('question-text');
                 if (q) q.value = '';
                 this.showStatus('✅ Question answered successfully!', 'success');

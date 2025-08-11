@@ -71,7 +71,8 @@ else:
 def index():
     """Serve the main application page"""
     print("📄 Serving index.html")
-    return render_template('index.html')
+    ga_measurement_id = os.getenv('GA_MEASUREMENT_ID')
+    return render_template('index.html', ga_measurement_id=ga_measurement_id)
 
 # Static file route (explicit)
 @app.route('/static/<path:filename>')

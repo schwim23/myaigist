@@ -1,3 +1,4 @@
+import os
 from .openai_client import get_openai_client
 
 class Summarizer:
@@ -5,7 +6,7 @@ class Summarizer:
 
     def __init__(self):
         self.client = get_openai_client()
-        self.model = "gpt-3.5-turbo"
+        self.model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
         
         # Define summary configurations for different detail levels
         self.summary_configs = {
