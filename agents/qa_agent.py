@@ -45,6 +45,7 @@ class QAAgent:
             print("🗑️  Clearing previous documents for new upload")
             self.documents = []
             self.vector_store.clear()
+            self.vector_store.save()  # Persist empty state immediately
             
             # Clean and chunk the text
             cleaned_text = self._clean_text(text)
