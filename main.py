@@ -74,6 +74,12 @@ def index():
     ga_measurement_id = os.getenv('GA_MEASUREMENT_ID')
     return render_template('index.html', ga_measurement_id=ga_measurement_id)
 
+# Favicon route
+@app.route('/favicon.ico')
+def favicon():
+    """Serve favicon"""
+    return send_from_directory('static', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
 # Static file route (explicit)
 @app.route('/static/<path:filename>')
 def static_files(filename):
