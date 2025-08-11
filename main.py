@@ -128,9 +128,8 @@ def process_content():
                         qa_success = qa_agent.add_document(text, 'User Text Input')
                         print(f"✅ QA storage result: {qa_success}")
                         
-                        # Force rebuild vectors after adding document
-                        print("🔄 Rebuilding vectors after document storage...")
-                        qa_agent._rebuild_vectors()
+                        # Vector store automatically saves after adding documents
+                        print("✅ Document processed and vectors stored")
                         
                         # Verify storage worked
                         status = qa_agent.get_status()
@@ -203,9 +202,8 @@ def process_content():
                         qa_success = qa_agent.add_document(text, filename)
                         print(f"✅ QA storage result: {qa_success}")
                         
-                        # Force rebuild vectors after adding document
-                        print("🔄 Rebuilding vectors after document storage...")
-                        qa_agent._rebuild_vectors()
+                        # Vector store automatically saves after adding documents
+                        print("✅ Document processed and vectors stored")
                         
                         # Verify storage worked
                         status = qa_agent.get_status()
@@ -476,17 +474,17 @@ def rebuild_vectors():
         return jsonify({'error': 'QA agent not available'}), 500
     
     try:
-        print("🔄 Manually rebuilding QA agent vectors...")
+        print("ℹ️ Checking vector store status...")
         
-        # Force rebuild vectors
-        qa_agent._rebuild_vectors()
+        # No need to rebuild vectors - using new vector store with automatic persistence
+        print("ℹ️ Vector store uses automatic persistence - no manual rebuild needed")
         status = qa_agent.get_status()
         
-        print(f"✅ Vectors rebuilt, new status: {status}")
+        print(f"✅ Vector store status: {status}")
         
         return jsonify({
             'success': True,
-            'message': 'Vectors rebuilt successfully',
+            'message': 'Vector store uses automatic persistence - no rebuild needed',
             'qa_status': status
         })
     except Exception as e:
