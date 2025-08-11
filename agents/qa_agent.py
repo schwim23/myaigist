@@ -27,7 +27,7 @@ class QAAgent:
     
     def add_document(self, text: str, title: str = "Document") -> bool:
         """
-        Add a document to the knowledge base
+        Add a document to the knowledge base (replaces existing documents)
         
         Args:
             text (str): Document text
@@ -41,6 +41,11 @@ class QAAgent:
                 print("⚠️  Document too short to add")
                 return False
             
+            # Clear previous documents and vectors for single-document mode
+            print("🗑️  Clearing previous documents for new upload")
+            self.documents = []
+            self.vector_store.clear()
+            
             # Clean and chunk the text
             cleaned_text = self._clean_text(text)
             chunks = self._chunk_text(cleaned_text)
@@ -50,7 +55,7 @@ class QAAgent:
                 return False
             
             # Store document
-            doc_index = len(self.documents)
+            doc_index = 0  # Always 0 since we clear previous
             document = {
                 'text': cleaned_text,
                 'title': title,
@@ -71,7 +76,7 @@ class QAAgent:
             # Save vector store
             self.vector_store.save()
             
-            print(f"✅ Added document '{title}' with {len(chunks)} chunks")
+            print(f"✅ Added document '{title}' with {len(chunks)} chunks (replaced previous)")
             return True
             
         except Exception as e:
