@@ -281,7 +281,6 @@ def process_content():
                         print(f"📊 QA Status after storage: {status}")
                         
                         # Verify file was actually saved
-                        import os
                         if os.path.exists(session_qa.vector_store.persist_path):
                             file_size = os.path.getsize(session_qa.vector_store.persist_path)
                             print(f"📦 Vector store file saved: {file_size} bytes")
@@ -369,7 +368,6 @@ def process_content():
                         print(f"📊 QA Status after storage: {status}")
                         
                         # Verify file was actually saved
-                        import os
                         if os.path.exists(session_qa.vector_store.persist_path):
                             file_size = os.path.getsize(session_qa.vector_store.persist_path)
                             print(f"📦 Vector store file saved: {file_size} bytes")
