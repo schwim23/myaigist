@@ -163,6 +163,7 @@ def process_content():
             data = request.get_json()
             content_type = data.get('type')
             summary_level = data.get('summary_level', 'standard')
+            voice = data.get('voice', 'nova')
             
             print(f"📝 Processing text content with {summary_level} summary")
             
@@ -180,8 +181,8 @@ def process_content():
                 audio_url = None
                 if transcriber:
                     try:
-                        audio_url = transcriber.text_to_speech(summary)
-                        print(f"🔊 Generated audio: {audio_url}")
+                        audio_url = transcriber.text_to_speech(summary, voice=voice)
+                        print(f"🔊 Generated audio with {voice} voice: {audio_url}")
                     except Exception as e:
                         print(f"⚠️  Audio generation failed: {e}")
                 
@@ -218,6 +219,7 @@ def process_content():
             file = request.files.get('file')
             content_type = request.form.get('type')
             summary_level = request.form.get('summary_level', 'standard')
+            voice = request.form.get('voice', 'nova')
             
             print(f"📄 Processing {content_type} file: {file.filename if file else 'None'} with {summary_level} summary")
             
@@ -255,8 +257,8 @@ def process_content():
                 audio_url = None
                 if transcriber:
                     try:
-                        audio_url = transcriber.text_to_speech(summary)
-                        print(f"🔊 Generated audio: {audio_url}")
+                        audio_url = transcriber.text_to_speech(summary, voice=voice)
+                        print(f"🔊 Generated audio with {voice} voice: {audio_url}")
                     except Exception as e:
                         print(f"⚠️  Audio generation failed: {e}")
                 
@@ -311,6 +313,7 @@ def ask_question():
     try:
         data = request.get_json()
         question = data.get('question')
+        voice = data.get('voice', 'nova')  # Default voice for Q&A audio
         if not question:
             return jsonify({'error': 'No question provided'}), 400
         
@@ -333,8 +336,8 @@ def ask_question():
         audio_url = None
         if transcriber:
             try:
-                audio_url = transcriber.text_to_speech(answer)
-                print(f"🔊 Generated audio for answer: {audio_url}")
+                audio_url = transcriber.text_to_speech(answer, voice=voice)
+                print(f"🔊 Generated audio for answer with {voice} voice: {audio_url}")
             except Exception as e:
                 print(f"⚠️  Audio generation failed: {e}")
         

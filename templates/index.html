@@ -51,6 +51,41 @@
             transform: translateY(-2px);
         }
         
+        /* Voice selector styling */
+        .voice-options {
+            margin: 20px 0;
+        }
+        
+        .voice-label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #495057;
+            font-size: 1rem;
+        }
+        
+        .voice-dropdown {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            background: white;
+            font-size: 1rem;
+            color: #495057;
+            cursor: pointer;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .voice-dropdown:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .voice-dropdown:hover {
+            border-color: #667eea;
+        }
+        
         @media (max-width: 768px) {
             .nav-header {
                 flex-direction: column;
@@ -60,6 +95,10 @@
             .nav-links {
                 flex-wrap: wrap;
                 justify-content: center;
+            }
+            
+            .voice-dropdown {
+                font-size: 0.95rem;
             }
         }
     </style>
@@ -129,6 +168,21 @@
                         <span class="summary-title">Detailed</span>
                         <span class="summary-desc">Comprehensive analysis</span>
                     </button>
+                </div>
+            </div>
+
+            <!-- Voice Options -->
+            <div class="voice-options">
+                <label class="voice-label">🔊 Voice for Audio Responses:</label>
+                <div class="voice-selector">
+                    <select id="voice-select" class="voice-dropdown">
+                        <option value="nova" selected>Nova (Default) - Balanced & Clear</option>
+                        <option value="alloy">Alloy - Neutral & Professional</option>
+                        <option value="echo">Echo - Warm & Friendly</option>
+                        <option value="fable">Fable - Expressive & Dynamic</option>
+                        <option value="onyx">Onyx - Deep & Authoritative</option>
+                        <option value="shimmer">Shimmer - Bright & Energetic</option>
+                    </select>
                 </div>
             </div>
 

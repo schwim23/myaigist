@@ -7,6 +7,7 @@ class MyAIGist {
         this.startTime = null;
         this.currentRecordingBlob = null;
         this.selectedSummaryLevel = 'standard'; // Default to standard
+        this.selectedVoice = 'nova'; // Default voice
 
         // Bind methods (extra safety against "not a function" if something rebinds context)
         this.processContent = this.processContent.bind(this);
@@ -20,6 +21,7 @@ class MyAIGist {
         this.setupEventListeners();
         this.setupTabs();
         this.setupSummaryLevels();
+        this.setupVoiceSelection();
 
         // Debug: list methods to ensure processContent exists
         const protoMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this));
@@ -139,6 +141,16 @@ class MyAIGist {
                 this.showStatus(`Summary level set to: ${levelNames[level]}`, 'success');
             });
         });
+    }
+
+    setupVoiceSelection() {
+        const voiceSelect = document.getElementById('voice-select');
+        if (voiceSelect) {
+            voiceSelect.addEventListener('change', () => {
+                this.selectedVoice = voiceSelect.value;
+                console.log('🔊 Voice selected:', this.selectedVoice);
+            });
+        }
     }
 
     // ===== Recording methods (unchanged) =====
@@ -385,7 +397,7 @@ class MyAIGist {
             if (activeTab === 'text') {
                 const text = document.getElementById('text-input')?.value?.trim() || '';
                 if (!text) throw new Error('Please enter some text to analyze');
-                requestData = { type: 'text', text, summary_level: this.selectedSummaryLevel };
+                requestData = { type: 'text', text, summary_level: this.selectedSummaryLevel, voice: this.selectedVoice };
 
             } else if (activeTab === 'file') {
                 const fileInput = document.getElementById('file-input');
@@ -395,6 +407,7 @@ class MyAIGist {
                 formData.append('file', fileInput.files[0]);
                 formData.append('type', 'file');
                 formData.append('summary_level', this.selectedSummaryLevel);
+                formData.append('voice', this.selectedVoice);
                 isFormData = true;
             }
 
@@ -482,7 +495,7 @@ class MyAIGist {
             const response = await fetch('/api/ask-question', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ question: questionText })
+                body: JSON.stringify({ question: questionText, voice: this.selectedVoice })
             });
 
             if (!response.ok) {
