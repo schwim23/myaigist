@@ -77,6 +77,7 @@ def get_session_qa_agent():
         print(f"🆔 Created new session: {session['session_id']}")
     
     session_id = session['session_id']
+    print(f"🔍 DEBUG: Using session_id: {session_id}")
     
     try:
         # Import here to avoid circular imports
@@ -84,10 +85,14 @@ def get_session_qa_agent():
         
         # Create session-specific QA agent with custom vector store path
         qa = QAAgent(session_id=session_id)
+        status = qa.get_status()
         print(f"✅ QA Agent ready for session: {session_id}")
+        print(f"📊 QA Agent Status: {status}")
         return qa
     except Exception as e:
         print(f"❌ Error creating session QA agent: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def cleanup_old_sessions(max_age_hours=24):
