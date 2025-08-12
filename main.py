@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 import uuid
 import secrets
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -27,6 +28,12 @@ app = Flask(__name__,
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(16))
+
+# Session configuration for better persistence
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = 24 * 60 * 60  # 24 hours
 
 # Ensure directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -72,12 +79,20 @@ else:
 # Session-based QA agent management
 def get_session_qa_agent():
     """Get or create a QA agent for the current session"""
+    # Make session permanent for better persistence
+    session.permanent = True
+    
     if 'session_id' not in session:
         session['session_id'] = secrets.token_hex(8)
+        session['created_at'] = str(datetime.now())
         print(f"🆔 Created new session: {session['session_id']}")
+    else:
+        print(f"🔄 Using existing session: {session['session_id']}")
     
     session_id = session['session_id']
-    print(f"🔍 DEBUG: Using session_id: {session_id}")
+    print(f"🔍 DEBUG: Session ID: {session_id}")
+    print(f"🔍 DEBUG: Session created: {session.get('created_at', 'Unknown')}")
+    print(f"🔍 DEBUG: Session keys: {list(session.keys())}")
     
     try:
         # Import here to avoid circular imports
@@ -88,6 +103,10 @@ def get_session_qa_agent():
         status = qa.get_status()
         print(f"✅ QA Agent ready for session: {session_id}")
         print(f"📊 QA Agent Status: {status}")
+        
+        # Store session info for debugging
+        session['last_qa_access'] = str(datetime.now())
+        
         return qa
     except Exception as e:
         print(f"❌ Error creating session QA agent: {e}")
@@ -191,12 +210,16 @@ def process_content():
                     except Exception as e:
                         print(f"⚠️  Audio generation failed: {e}")
                 
-                # Store for QA with session-based agent - WITH DEBUGGING
+                # Store for QA with session-based agent - WITH ENHANCED DEBUGGING
                 qa_success = False
                 session_qa = get_session_qa_agent()
                 if session_qa:
                     try:
+                        print(f"🔍 CONTENT PROCESSING DEBUG:")
+                        print(f"🆔 Session ID: {session.get('session_id')}")
+                        print(f"📁 Vector store path: {session_qa.vector_store.persist_path}")
                         print(f"💾 Storing text for Q&A (length: {len(text)})")
+                        
                         qa_success = session_qa.add_document(text, 'User Text Input')
                         print(f"✅ QA storage result: {qa_success}")
                         
@@ -206,6 +229,14 @@ def process_content():
                         # Verify storage worked
                         status = session_qa.get_status()
                         print(f"📊 QA Status after storage: {status}")
+                        
+                        # Verify file was actually saved
+                        import os
+                        if os.path.exists(session_qa.vector_store.persist_path):
+                            file_size = os.path.getsize(session_qa.vector_store.persist_path)
+                            print(f"📦 Vector store file saved: {file_size} bytes")
+                        else:
+                            print(f"⚠️ Vector store file NOT found at: {session_qa.vector_store.persist_path}")
                         
                     except Exception as e:
                         print(f"❌ QA storage failed: {e}")
@@ -267,12 +298,16 @@ def process_content():
                     except Exception as e:
                         print(f"⚠️  Audio generation failed: {e}")
                 
-                # Store for QA with session-based agent - WITH DEBUGGING
+                # Store for QA with session-based agent - WITH ENHANCED DEBUGGING
                 qa_success = False
                 session_qa = get_session_qa_agent()
                 if session_qa:
                     try:
+                        print(f"🔍 FILE PROCESSING DEBUG:")
+                        print(f"🆔 Session ID: {session.get('session_id')}")
+                        print(f"📁 Vector store path: {session_qa.vector_store.persist_path}")
                         print(f"💾 Storing document '{filename}' for Q&A (length: {len(text)})")
+                        
                         qa_success = session_qa.add_document(text, filename)
                         print(f"✅ QA storage result: {qa_success}")
                         
@@ -282,6 +317,14 @@ def process_content():
                         # Verify storage worked
                         status = session_qa.get_status()
                         print(f"📊 QA Status after storage: {status}")
+                        
+                        # Verify file was actually saved
+                        import os
+                        if os.path.exists(session_qa.vector_store.persist_path):
+                            file_size = os.path.getsize(session_qa.vector_store.persist_path)
+                            print(f"📦 Vector store file saved: {file_size} bytes")
+                        else:
+                            print(f"⚠️ Vector store file NOT found at: {session_qa.vector_store.persist_path}")
                         
                     except Exception as e:
                         print(f"❌ QA storage failed: {e}")
@@ -310,6 +353,10 @@ def process_content():
 @app.route('/api/ask-question', methods=['POST'])
 def ask_question():
     """Handle Q&A requests"""
+    print(f"🔍 =========================")
+    print(f"🔍 ASK QUESTION DEBUG START")
+    print(f"🔍 =========================")
+    
     # Get session-based QA agent
     session_qa = get_session_qa_agent()
     if not session_qa:
@@ -323,16 +370,62 @@ def ask_question():
             return jsonify({'error': 'No question provided'}), 400
         
         print(f"❓ Processing question: {question[:50]}...")
+        print(f"🆔 Session ID: {session.get('session_id', 'None')}")
+        print(f"📁 Vector store path: {session_qa.vector_store.persist_path}")
         
         # Debug QA agent status before answering
         status = session_qa.get_status()
         print(f"📊 QA Agent Status: {status}")
         
+        # Check if vector store file exists on disk
+        import os
+        vector_file_exists = os.path.exists(session_qa.vector_store.persist_path)
+        print(f"💾 Vector store file exists: {vector_file_exists}")
+        if vector_file_exists:
+            file_size = os.path.getsize(session_qa.vector_store.persist_path)
+            print(f"📦 Vector store file size: {file_size} bytes")
+        
+        # Enhanced debugging - try to reload if no vectors in memory
         if not status.get('ready_for_questions', False):
-            return jsonify({
-                'error': 'No documents available for Q&A. Please upload a document first.',
-                'qa_status': status
-            }), 400
+            print("⚠️ No documents detected, attempting diagnosis...")
+            
+            # Try to reload the vector store
+            try:
+                print("🔄 Reloading vector store from disk...")
+                session_qa.vector_store.load()
+                status_after_reload = session_qa.get_status()
+                print(f"📊 Status after reload: {status_after_reload}")
+                
+                if status_after_reload.get('ready_for_questions', False):
+                    print("✅ Successfully reloaded vectors!")
+                    status = status_after_reload
+                else:
+                    print("❌ Still no vectors after reload")
+                    return jsonify({
+                        'error': 'No documents available for Q&A. Please upload a document first.',
+                        'debug_info': {
+                            'session_id': session.get('session_id'),
+                            'vector_store_path': str(session_qa.vector_store.persist_path),
+                            'file_exists': vector_file_exists,
+                            'file_size': file_size if vector_file_exists else 0,
+                            'documents_in_memory': len(session_qa.documents),
+                            'vectors_in_memory': len(session_qa.vector_store.vectors),
+                            'status_before_reload': status,
+                            'status_after_reload': status_after_reload
+                        }
+                    }), 400
+                    
+            except Exception as reload_error:
+                print(f"❌ Error reloading vector store: {reload_error}")
+                return jsonify({
+                    'error': 'No documents available for Q&A. Please upload a document first.',
+                    'reload_error': str(reload_error),
+                    'debug_info': {
+                        'session_id': session.get('session_id'),
+                        'vector_store_path': str(session_qa.vector_store.persist_path),
+                        'file_exists': vector_file_exists
+                    }
+                }), 400
         
         # Get answer from QA agent
         answer = session_qa.answer_question(question)
@@ -445,11 +538,30 @@ def qa_debug():
     
     try:
         status = session_qa.get_status()
+        
+        # Check file system
+        import os
+        vector_file_exists = os.path.exists(session_qa.vector_store.persist_path)
+        file_size = os.path.getsize(session_qa.vector_store.persist_path) if vector_file_exists else 0
+        
         return jsonify({
+            'session_info': {
+                'session_id': session.get('session_id'),
+                'created_at': session.get('created_at'),
+                'last_qa_access': session.get('last_qa_access'),
+                'session_keys': list(session.keys())
+            },
             'qa_agent_status': status,
             'ready_for_questions': status.get('ready_for_questions', False),
             'documents_loaded': status.get('documents_count', 0),
-            'chunks_available': status.get('chunks_count', 0)
+            'chunks_available': status.get('chunks_count', 0),
+            'vector_store_info': {
+                'path': str(session_qa.vector_store.persist_path),
+                'file_exists': vector_file_exists,
+                'file_size': file_size,
+                'vectors_in_memory': len(session_qa.vector_store.vectors),
+                'documents_in_memory': len(session_qa.documents)
+            }
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
