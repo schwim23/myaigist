@@ -821,9 +821,9 @@ def upload_multiple_files():
                 combined_summary = f"Successfully uploaded {successful_uploads} files with summaries:\n\n" + combined_text
                 
                 # Generate audio for combined summary
-                if tts_agent:
+                if transcriber:
                     try:
-                        audio_url = tts_agent.text_to_speech(combined_summary, voice=voice)
+                        audio_url = transcriber.text_to_speech(combined_summary, voice=voice)
                     except Exception as tts_error:
                         print(f"⚠️ TTS failed: {tts_error}")
         

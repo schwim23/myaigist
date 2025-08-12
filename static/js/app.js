@@ -100,13 +100,15 @@ class MyAIGist {
             });
         }
 
-        // ✅ File input filename display
+        // ✅ Unified file input handling (single or multiple files)
         const fileInput = document.getElementById('file-input');
         const fileNameEl = document.getElementById('file-name');
-        if (fileInput && fileNameEl) {
-            fileInput.addEventListener('change', () => {
-                const name = fileInput.files && fileInput.files[0] ? fileInput.files[0].name : 'No file chosen';
-                fileNameEl.textContent = name;
+        const selectedFilesDiv = document.getElementById('selected-files');
+        
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                this.selectedFiles = Array.from(e.target.files);
+                this.updateFileDisplay();
             });
         }
     }
@@ -407,15 +409,20 @@ class MyAIGist {
                 requestData = { type: 'text', text, summary_level: this.selectedSummaryLevel, voice: this.selectedVoice };
 
             } else if (activeTab === 'file') {
-                const fileInput = document.getElementById('file-input');
-                if (!fileInput?.files?.length) throw new Error('Please select a file to upload');
+                if (!this.selectedFiles?.length) throw new Error('Please select a file to upload');
 
-                formData = new FormData();
-                formData.append('file', fileInput.files[0]);
-                formData.append('type', 'file');
-                formData.append('summary_level', this.selectedSummaryLevel);
-                formData.append('voice', this.selectedVoice);
-                isFormData = true;
+                if (this.selectedFiles.length === 1) {
+                    // Single file - use existing endpoint
+                    formData = new FormData();
+                    formData.append('file', this.selectedFiles[0]);
+                    formData.append('type', 'file');
+                    formData.append('summary_level', this.selectedSummaryLevel);
+                    formData.append('voice', this.selectedVoice);
+                    isFormData = true;
+                } else {
+                    // Multiple files - use multi-file upload
+                    return this.uploadMultipleFiles();
+                }
             }
 
             const levelNames = { quick: 'Quick', standard: 'Standard', detailed: 'Detailed' };
@@ -462,13 +469,19 @@ class MyAIGist {
                 this.showStatus(`Content processed successfully with ${levelNames[this.selectedSummaryLevel]} summary! You can now ask questions.`, 'success');
                 console.log('✅ Content processed successfully, QA stored:', result.qa_stored);
 
-                // Clear text input for next entry if it was a text submission
+                // Clear inputs for next entry
                 if (activeTab === 'text') {
                     const textInput = document.getElementById('text-input');
                     if (textInput) {
                         textInput.value = '';
                         textInput.placeholder = 'Enter your next text here for AI analysis...';
                     }
+                } else if (activeTab === 'file') {
+                    // Clear file selection
+                    this.selectedFiles = [];
+                    this.updateFileDisplay();
+                    const fileInput = document.getElementById('file-input');
+                    if (fileInput) fileInput.value = '';
                 }
 
                 // Refresh file shelf if document was stored for QA
@@ -714,62 +727,60 @@ class MyAIGist {
         }
     }
 
-    // Multi-File Upload Setup
+    // File Upload Setup (unified for single or multiple files)
     setupMultiFileUpload() {
-        const multiFileInput = document.getElementById('multi-file-input');
-        const selectedFilesDiv = document.getElementById('selected-files');
-        const selectedFilesList = document.getElementById('selected-files-list');
-        const uploadBtn = document.getElementById('upload-multiple-btn');
-
-        if (multiFileInput) {
-            multiFileInput.addEventListener('change', (e) => {
-                this.selectedFiles = Array.from(e.target.files);
-                this.updateSelectedFilesList();
-            });
-        }
-
-        if (uploadBtn) {
-            uploadBtn.addEventListener('click', this.uploadMultipleFiles);
-        }
+        // The file input change handler is now in setupEventListeners()
+        // This method is kept for compatibility but doesn't need to do anything
+        console.log('✅ File upload system initialized (unified single/multi)');
     }
 
-    updateSelectedFilesList() {
+    updateFileDisplay() {
         const selectedFilesDiv = document.getElementById('selected-files');
         const selectedFilesList = document.getElementById('selected-files-list');
-        const uploadBtn = document.getElementById('upload-multiple-btn');
-
-        if (!selectedFilesDiv || !selectedFilesList || !uploadBtn) return;
+        const fileNameEl = document.getElementById('file-name');
 
         if (this.selectedFiles.length === 0) {
-            selectedFilesDiv.style.display = 'none';
-            uploadBtn.disabled = true;
+            if (selectedFilesDiv) selectedFilesDiv.style.display = 'none';
+            if (fileNameEl) {
+                fileNameEl.style.display = 'block';
+                fileNameEl.textContent = 'No files selected';
+            }
             return;
         }
 
-        selectedFilesDiv.style.display = 'block';
-        uploadBtn.disabled = false;
-
-        selectedFilesList.innerHTML = this.selectedFiles.map((file, index) => `
-            <div class="selected-file-item">
-                <span class="selected-file-name">${file.name}</span>
-                <button class="remove-file" onclick="myAIGist.removeSelectedFile(${index})" title="Remove file">
-                    ×
-                </button>
-            </div>
-        `).join('');
-
-        // Update button text
-        uploadBtn.textContent = `🚀 Upload ${this.selectedFiles.length} File${this.selectedFiles.length > 1 ? 's' : ''}`;
+        if (this.selectedFiles.length === 1) {
+            // Single file - show simple display
+            if (selectedFilesDiv) selectedFilesDiv.style.display = 'none';
+            if (fileNameEl) {
+                fileNameEl.style.display = 'block';
+                fileNameEl.textContent = `Selected: ${this.selectedFiles[0].name}`;
+            }
+        } else {
+            // Multiple files - show detailed list
+            if (fileNameEl) fileNameEl.style.display = 'none';
+            if (selectedFilesDiv && selectedFilesList) {
+                selectedFilesDiv.style.display = 'block';
+                
+                selectedFilesList.innerHTML = this.selectedFiles.map((file, index) => `
+                    <div class="selected-file-item">
+                        <span class="selected-file-name">${file.name}</span>
+                        <button class="remove-file" onclick="myAIGist.removeSelectedFile(${index})" title="Remove file">
+                            ×
+                        </button>
+                    </div>
+                `).join('');
+            }
+        }
     }
 
     removeSelectedFile(index) {
         this.selectedFiles.splice(index, 1);
-        this.updateSelectedFilesList();
+        this.updateFileDisplay();
         
         // Update the file input
-        const multiFileInput = document.getElementById('multi-file-input');
-        if (multiFileInput && this.selectedFiles.length === 0) {
-            multiFileInput.value = '';
+        const fileInput = document.getElementById('file-input');
+        if (fileInput && this.selectedFiles.length === 0) {
+            fileInput.value = '';
         }
     }
 
@@ -780,19 +791,19 @@ class MyAIGist {
 
             if (this.selectedFiles.length === 0) {
                 this.showStatus('Please select files first', 'error');
-                return;
+                return false; // Return false to indicate failure
             }
 
             if (this.selectedFiles.length > 5) {
                 this.showStatus('Maximum 5 files allowed', 'error');
-                return;
+                return false;
             }
 
             // Validate file sizes and types
             for (const file of this.selectedFiles) {
                 if (file.size > 50 * 1024 * 1024) { // 50MB limit
                     this.showStatus(`File "${file.name}" is too large (max 50MB)`, 'error');
-                    return;
+                    return false;
                 }
                 
                 const allowedTypes = ['.pdf', '.docx', '.txt'];
@@ -802,7 +813,7 @@ class MyAIGist {
                 
                 if (!hasValidExtension) {
                     this.showStatus(`File "${file.name}" has unsupported format. Allowed: PDF, DOCX, TXT`, 'error');
-                    return;
+                    return false;
                 }
             }
 
@@ -826,24 +837,40 @@ class MyAIGist {
             console.log('📡 Response status:', response.status);
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Upload failed:', errorText);
-                throw new Error(`Upload failed (${response.status}): ${errorText}`);
+                let errorDetails = '';
+                try {
+                    const errorText = await response.text();
+                    console.error('❌ Upload failed - Raw response:', errorText);
+                    
+                    // Try to parse as JSON for detailed error
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorDetails = errorData.error || errorText;
+                        console.error('❌ Upload failed - Parsed error:', errorData);
+                    } catch (parseError) {
+                        errorDetails = errorText;
+                    }
+                } catch (readError) {
+                    errorDetails = `Unable to read error response: ${readError.message}`;
+                }
+                
+                throw new Error(`Upload failed (${response.status}): ${errorDetails}`);
             }
 
             const data = await response.json();
             console.log('✅ Upload response:', data);
 
             if (data.success) {
-                this.showStatus(`Successfully uploaded ${data.successful_uploads} files!`, 'success');
+                this.showSummary(data.combined_summary || 'Multiple files processed successfully', data.audio_url, this.selectedSummaryLevel);
                 
                 // Clear selected files
                 this.selectedFiles = [];
-                this.updateSelectedFilesList();
-                document.getElementById('multi-file-input').value = '';
+                this.updateFileDisplay();
+                const fileInput = document.getElementById('file-input');
+                if (fileInput) fileInput.value = '';
 
-                // Display results
-                this.displayMultiFileResults(data);
+                // Show Q&A section
+                this.showQASection();
                 
                 // Refresh file shelf
                 await this.loadUserDocuments();
@@ -854,6 +881,9 @@ class MyAIGist {
                     successful_uploads: data.successful_uploads,
                     summary_level: this.selectedSummaryLevel
                 });
+                
+                this.showStatus(`Successfully uploaded ${data.successful_uploads} files!`, 'success');
+                return true; // Return true to indicate success
 
             } else {
                 throw new Error(data.error || 'Upload failed');
@@ -862,6 +892,7 @@ class MyAIGist {
         } catch (error) {
             console.error('❌ Multi-file upload error:', error);
             this.showStatus(`Upload error: ${error.message}`, 'error');
+            return false; // Return false to indicate failure
         }
     }
 

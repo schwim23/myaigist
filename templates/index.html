@@ -199,44 +199,47 @@
         
         .file-count-badge {
             background: #60a5fa;
-            color: white;
+            color: #ffffff;
             border-radius: 12px;
             padding: 2px 8px;
             font-size: 0.8em;
             font-weight: 600;
             margin-left: 8px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
         }
         
-        /* Multiple file upload styles */
-        .multi-file-section {
+        /* Unified upload section styles */
+        .unified-upload-section {
             margin-bottom: 30px;
-            padding: 20px;
+            padding: 25px;
             background: rgba(255, 255, 255, 0.05);
             border-radius: 15px;
             border: 2px dashed rgba(96, 165, 250, 0.3);
             transition: all 0.3s ease;
         }
         
-        .multi-file-section:hover {
+        .unified-upload-section:hover {
             border-color: rgba(96, 165, 250, 0.5);
             background: rgba(255, 255, 255, 0.08);
         }
         
-        .multi-file-header {
+        .upload-header {
             text-align: center;
             margin-bottom: 20px;
         }
         
-        .multi-file-title {
-            color: white;
+        .upload-title {
+            color: #ffffff;
             font-size: 1.3em;
             font-weight: 600;
             margin-bottom: 8px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
         
-        .multi-file-desc {
-            color: rgba(255, 255, 255, 0.7);
+        .upload-desc {
+            color: rgba(255, 255, 255, 0.8);
             font-size: 0.95em;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
         }
         
         .file-input-container {
@@ -273,11 +276,19 @@
             margin-top: 15px;
         }
         
+        .selected-files-header {
+            color: #ffffff;
+            margin-bottom: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        
         .selected-file-item {
-            background: rgba(30, 30, 45, 0.8);
+            background: rgba(30, 30, 45, 0.9);
             border: 1px solid rgba(96, 165, 250, 0.3);
             border-radius: 8px;
-            padding: 10px 15px;
+            padding: 12px 15px;
             margin-bottom: 8px;
             display: flex;
             justify-content: space-between;
@@ -296,36 +307,28 @@
         
         .remove-file {
             background: rgba(239, 68, 68, 0.2);
-            border: none;
+            border: 1px solid rgba(239, 68, 68, 0.3);
             color: #f87171;
             border-radius: 50%;
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             font-size: 12px;
             cursor: pointer;
+            transition: all 0.2s ease;
         }
         
-        .upload-multiple-btn {
-            width: 100%;
-            background: linear-gradient(135deg, #16a34a, #15803d);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 10px;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
+        .remove-file:hover {
+            background: rgba(239, 68, 68, 0.4);
+            border-color: rgba(239, 68, 68, 0.5);
         }
         
-        .upload-multiple-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
-        }
-        
-        .upload-multiple-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .file-name {
+            color: #ffffff;
+            font-size: 0.9em;
+            margin-top: 10px;
+            text-align: center;
+            font-style: italic;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
         
         /* Voice selector styling */
@@ -430,37 +433,25 @@
 
                 <!-- File Upload -->
                 <div id="file-tab" class="tab-panel">
-                    <!-- Single File Upload -->
-                    <div class="file-upload">
-                        <input type="file" id="file-input" accept=".pdf,.docx,.txt" />
-                        <label for="file-input">
-                            📄 Choose Document (PDF, DOCX, TXT)
-                        </label>
-                        <span id="file-name" class="file-name">No file chosen</span>
-                    </div>
-                    
-                    <!-- Multi-File Upload Section -->
-                    <div class="multi-file-section">
-                        <div class="multi-file-header">
-                            <h3 class="multi-file-title">📚 Multiple Files Upload</h3>
-                            <p class="multi-file-desc">Upload up to 5 files at once for combined analysis</p>
+                    <div class="unified-upload-section">
+                        <div class="upload-header">
+                            <h3 class="upload-title">📁 Document Upload</h3>
+                            <p class="upload-desc">Select one or more documents (up to 5 files) - PDF, DOCX, or TXT</p>
                         </div>
                         
                         <div class="file-input-container">
-                            <input type="file" id="multi-file-input" class="file-input" multiple accept=".pdf,.docx,.txt" />
-                            <label for="multi-file-input" class="file-input-label">
-                                📁 Select Multiple Files
+                            <input type="file" id="file-input" class="file-input" multiple accept=".pdf,.docx,.txt" />
+                            <label for="file-input" class="file-input-label">
+                                📄 Choose Document(s)
                             </label>
                         </div>
                         
                         <div id="selected-files" class="selected-files" style="display: none;">
-                            <h4 style="color: white; margin-bottom: 10px;">Selected Files:</h4>
+                            <h4 class="selected-files-header">Selected Files:</h4>
                             <div id="selected-files-list"></div>
                         </div>
                         
-                        <button id="upload-multiple-btn" class="upload-multiple-btn" disabled>
-                            🚀 Upload Selected Files
-                        </button>
+                        <div id="file-name" class="file-name" style="display: none;">No files selected</div>
                     </div>
                 </div>
             </div>
