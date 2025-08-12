@@ -1,4 +1,6 @@
 import os
+import uuid
+from datetime import datetime
 from openai import OpenAI
 from typing import List, Dict, Any
 import re
@@ -7,12 +9,13 @@ from .vector_store import VectorStore
 class QAAgent:
     """Agent responsible for question answering using RAG approach"""
     
-    def __init__(self, session_id: str = None):
-        """Initialize the QA Agent with optional session-based isolation"""
+    def __init__(self, session_id: str = None, user_id: str = None):
+        """Initialize the QA Agent with optional session-based isolation and user identification"""
         try:
             self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
             self.model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
             self.session_id = session_id
+            self.user_id = user_id
             
             # Storage for documents and their metadata
             self.documents = []  # List of {'text': str, 'title': str, 'chunks': List[str]}
@@ -35,7 +38,7 @@ class QAAgent:
     
     def add_document(self, text: str, title: str = "Document") -> bool:
         """
-        Add a document to the knowledge base (replaces existing documents)
+        Add a document to the knowledge base (supports multiple documents with user isolation)
         
         Args:
             text (str): Document text
@@ -49,11 +52,13 @@ class QAAgent:
                 print("⚠️  Document too short to add")
                 return False
             
-            # Clear previous documents and vectors for single-document mode
-            print("🗑️  Clearing previous documents for new upload")
-            self.documents = []
-            self.vector_store.clear()
-            self.vector_store.save()  # Persist empty state immediately
+            # For multi-user isolation, load existing data first
+            if not hasattr(self.vector_store, 'vectors') or not self.vector_store.vectors:
+                print("📂 Loading existing vector store...")
+                self.vector_store.load()
+                
+            # Clean up old documents for this user (keep max 5 per user)
+            self._cleanup_user_documents()
             
             # Clean and chunk the text
             cleaned_text = self._clean_text(text)
@@ -63,29 +68,40 @@ class QAAgent:
                 print("⚠️  No chunks created from document")
                 return False
             
-            # Store document
-            doc_index = 0  # Always 0 since we clear previous
+            # Generate unique document ID
+            doc_id = str(uuid.uuid4())
+            upload_time = datetime.now().isoformat()
+            
+            # Store document with user information
             document = {
+                'doc_id': doc_id,
+                'user_id': self.user_id,
                 'text': cleaned_text,
                 'title': title,
-                'chunks': chunks
+                'chunks': chunks,
+                'upload_time': upload_time
             }
             self.documents.append(document)
             
-            # Add chunks to vector store
+            # Add chunks to vector store with user metadata
             for chunk_index, chunk in enumerate(chunks):
                 metadata = {
-                    'doc_index': doc_index,
+                    'user_id': self.user_id,
+                    'doc_id': doc_id,
                     'chunk_index': chunk_index,
                     'title': title,
-                    'doc_title': title
+                    'doc_title': title,
+                    'upload_time': upload_time,
+                    'text': chunk[:100] + '...' if len(chunk) > 100 else chunk  # Preview for debugging
                 }
                 self.vector_store.add_text(chunk, metadata)
             
             # Save vector store
             self.vector_store.save()
             
-            print(f"✅ Added document '{title}' with {len(chunks)} chunks (replaced previous)")
+            user_doc_count = self._count_user_documents()
+            print(f"✅ Added document '{title}' with {len(chunks)} chunks for user {self.user_id}")
+            print(f"👤 User now has {user_doc_count} documents in vector store")
             return True
             
         except Exception as e:
@@ -206,11 +222,12 @@ class QAAgent:
             
             print(f"🔍 Searching among {len(self.vector_store.vectors)} chunks for: '{question}'")
             
-            # Use vector store similarity search
+            # Use vector store similarity search with user filtering
             search_results = self.vector_store.similarity_search(
                 query=question,
                 top_k=top_k,
-                min_similarity=0.1  # Lower threshold for better matching
+                min_similarity=0.1,  # Lower threshold for better matching
+                user_id=self.user_id
             )
             
             if not search_results:
@@ -218,7 +235,8 @@ class QAAgent:
                 search_results = self.vector_store.similarity_search(
                     query=question,
                     top_k=top_k,
-                    min_similarity=0.0  # Try with no threshold
+                    min_similarity=0.0,  # Try with no threshold
+                    user_id=self.user_id
                 )
             
             relevant_chunks = []
@@ -306,9 +324,88 @@ Please answer the question based on the context provided above."""
         except Exception as e:
             return f"Error generating answer: {str(e)}"
     
+    def _cleanup_user_documents(self, max_docs_per_user: int = 5):
+        """Remove oldest documents for current user if they exceed the limit"""
+        if not self.user_id or not hasattr(self.vector_store, 'metadata'):
+            return
+            
+        # Get all user documents sorted by upload time
+        user_docs = []
+        for i, metadata in enumerate(self.vector_store.metadata):
+            if metadata.get('user_id') == self.user_id:
+                user_docs.append((i, metadata))
+        
+        # Group by document ID and get unique documents
+        doc_times = {}
+        for _, metadata in user_docs:
+            doc_id = metadata.get('doc_id')
+            upload_time = metadata.get('upload_time', '')
+            if doc_id and doc_id not in doc_times:
+                doc_times[doc_id] = upload_time
+        
+        # If user has too many documents, remove oldest ones
+        if len(doc_times) >= max_docs_per_user:
+            sorted_docs = sorted(doc_times.items(), key=lambda x: x[1])  # Sort by time
+            docs_to_remove = sorted_docs[:len(sorted_docs) - max_docs_per_user + 1]
+            
+            for doc_id_to_remove, _ in docs_to_remove:
+                self._remove_document_by_id(doc_id_to_remove)
+                print(f"🗑️  Removed old document {doc_id_to_remove} for user {self.user_id}")
+    
+    def _remove_document_by_id(self, doc_id: str):
+        """Remove all chunks of a specific document"""
+        if not hasattr(self.vector_store, 'metadata'):
+            return
+            
+        # Find indices to remove (in reverse order to avoid index shifting)
+        indices_to_remove = []
+        for i, metadata in enumerate(self.vector_store.metadata):
+            if metadata.get('doc_id') == doc_id:
+                indices_to_remove.append(i)
+        
+        # Remove from vector store
+        for i in reversed(indices_to_remove):
+            if i < len(self.vector_store.vectors):
+                self.vector_store.vectors.pop(i)
+                self.vector_store.metadata.pop(i)
+        
+        # Remove from documents list
+        self.documents = [doc for doc in self.documents if doc.get('doc_id') != doc_id]
+    
+    def _count_user_documents(self) -> int:
+        """Count unique documents for current user"""
+        if not self.user_id or not hasattr(self.vector_store, 'metadata'):
+            return 0
+            
+        user_doc_ids = set()
+        for metadata in self.vector_store.metadata:
+            if metadata.get('user_id') == self.user_id and metadata.get('doc_id'):
+                user_doc_ids.add(metadata['doc_id'])
+        
+        return len(user_doc_ids)
+
     def get_status(self) -> Dict[str, Any]:
-        """Get current status of the QA agent"""
+        """Get current status of the QA agent (filtered by user in multi-user mode)"""
         vector_stats = self.vector_store.get_stats()
+        
+        # Count documents and chunks for current user
+        if self.user_id and hasattr(self.vector_store, 'metadata'):
+            user_doc_count = self._count_user_documents()
+            user_chunk_count = sum(1 for meta in self.vector_store.metadata 
+                                 if meta.get('user_id') == self.user_id)
+            
+            return {
+                'documents_count': user_doc_count,
+                'chunks_count': user_chunk_count,
+                'vectors_ready': user_chunk_count > 0,
+                'ready_for_questions': user_chunk_count > 0,
+                'embedding_dimension': vector_stats['dimension'],
+                'memory_usage_mb': vector_stats['memory_usage_mb'],
+                'user_id': self.user_id
+            }
+        else:
+            # Fallback to original behavior for non-user mode
+            vector_stats = self.vector_store.get_stats()
         
         # Count unique documents from vector metadata if documents list is empty
         unique_docs = set()

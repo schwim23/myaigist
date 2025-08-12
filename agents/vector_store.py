@@ -80,7 +80,7 @@ class VectorStore:
             print(f"❌ Error adding text to vector store: {e}")
             return None
     
-    def similarity_search(self, query: str, top_k: int = 5, min_similarity: float = 0.0) -> List[Dict[str, Any]]:
+    def similarity_search(self, query: str, top_k: int = 5, min_similarity: float = 0.0, user_id: str = None) -> List[Dict[str, Any]]:
         """
         Search for similar vectors using cosine similarity
         
@@ -88,6 +88,7 @@ class VectorStore:
             query (str): Query text to search for
             top_k (int): Number of top results to return
             min_similarity (float): Minimum similarity threshold
+            user_id (str): Optional user ID to filter results by user
             
         Returns:
             List[Dict]: List of results with metadata and similarity scores
@@ -110,9 +111,13 @@ class VectorStore:
                 print(f"❌ Query embedding dimension mismatch: expected {self.dimension}, got {len(query_vector)}")
                 return []
             
-            # Calculate cosine similarities
+            # Calculate cosine similarities (with optional user filtering)
             similarities = []
             for i, stored_vector in enumerate(self.vectors):
+                # Skip vectors not belonging to the specified user
+                if user_id and self.metadata[i].get('user_id') != user_id:
+                    continue
+                    
                 # Cosine similarity: dot product of normalized vectors
                 query_norm = query_vector / np.linalg.norm(query_vector)
                 stored_norm = stored_vector / np.linalg.norm(stored_vector)

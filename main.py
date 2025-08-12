@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import uuid
 import secrets
 from datetime import datetime
+import hashlib
 
 # Load environment variables
 load_dotenv()
@@ -90,6 +91,31 @@ if all_agents_ready:
 else:
     print("⚠️  Some core agents failed to initialize - some features may not work")
 
+def get_user_identifier():
+    """Get consistent user ID across requests for multi-user isolation"""
+    # Priority order:
+    # 1. Existing session user_id
+    # 2. Create stable ID from IP + User-Agent
+    # 3. Set in session for persistence
+    
+    if 'user_id' in session:
+        return session['user_id']
+    
+    # Create stable ID from IP + User-Agent for consistency across requests
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or '127.0.0.1')
+    if ',' in ip:
+        ip = ip.split(',')[0].strip()  # Handle load balancer forwarded IPs
+    
+    ua = request.headers.get('User-Agent', 'unknown')
+    user_hash = hashlib.md5(f"{ip}:{ua}".encode()).hexdigest()[:8]
+    
+    user_id = f"user_{user_hash}"
+    session['user_id'] = user_id
+    session.permanent = True  # Keep user ID persistent
+    
+    print(f"👤 User ID: {user_id} (IP: {ip[:12]}...)")
+    return user_id
+
 # Session-based QA agent management
 def get_session_qa_agent():
     """Get or create a QA agent for the current session"""
@@ -112,14 +138,17 @@ def get_session_qa_agent():
         # Import here to avoid circular imports
         from agents.qa_agent import QAAgent
         
-        # Use single shared vector store in production (when using EFS), session-based for local development
+        # Get user identifier for multi-user isolation
+        user_id = get_user_identifier()
+        
+        # Use shared multi-user vector store in production, session-based for local development
         flask_env = os.getenv('FLASK_ENV', 'development')
         if flask_env == 'production':
-            print(f"🏭 Production mode: Using shared vector store")
-            qa = QAAgent(session_id="shared")  # Single shared vector store for all users
+            print(f"🏭 Production mode: Using shared multi-user vector store")
+            qa = QAAgent(session_id="shared", user_id=user_id)  # Shared store with user isolation
         else:
             print(f"🏠 Development mode: Using session-based vector store")
-            qa = QAAgent(session_id=session_id)  # Session-specific for development
+            qa = QAAgent(session_id=session_id, user_id=user_id)  # Session-specific for development
             
         status = qa.get_status()
         print(f"✅ QA Agent ready for session: {session_id} (mode: {flask_env})")
