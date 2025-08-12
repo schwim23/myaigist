@@ -98,10 +98,17 @@ def get_session_qa_agent():
         # Import here to avoid circular imports
         from agents.qa_agent import QAAgent
         
-        # Create session-specific QA agent with custom vector store path
-        qa = QAAgent(session_id=session_id)
+        # Use single shared vector store in production (when using EFS), session-based for local development
+        flask_env = os.getenv('FLASK_ENV', 'development')
+        if flask_env == 'production':
+            print(f"🏭 Production mode: Using shared vector store")
+            qa = QAAgent(session_id="shared")  # Single shared vector store for all users
+        else:
+            print(f"🏠 Development mode: Using session-based vector store")
+            qa = QAAgent(session_id=session_id)  # Session-specific for development
+            
         status = qa.get_status()
-        print(f"✅ QA Agent ready for session: {session_id}")
+        print(f"✅ QA Agent ready for session: {session_id} (mode: {flask_env})")
         print(f"📊 QA Agent Status: {status}")
         
         # Store session info for debugging
