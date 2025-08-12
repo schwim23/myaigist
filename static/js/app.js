@@ -817,7 +817,7 @@ class MyAIGist {
                 }
             }
 
-            this.showStatus(`Uploading ${this.selectedFiles.length} files...`, 'loading');
+            this.showStatus(`Analyzing ${this.selectedFiles.length} document${this.selectedFiles.length > 1 ? 's' : ''}...`, 'loading');
 
             const formData = new FormData();
             this.selectedFiles.forEach(file => {
@@ -827,7 +827,7 @@ class MyAIGist {
             formData.append('summary_level', this.selectedSummaryLevel);
             formData.append('voice', this.selectedVoice);
 
-            console.log('📡 Sending multi-file upload request...');
+            console.log('📡 Sending multi-file analysis request...');
             
             const response = await fetch('/api/upload-multiple-files', {
                 method: 'POST',
@@ -841,7 +841,7 @@ class MyAIGist {
                 
                 // Handle specific error types
                 if (response.status === 504) {
-                    errorDetails = 'Upload timed out. The files may be too large or the server is busy. Please try with fewer or smaller files.';
+                    errorDetails = 'Analysis timed out. The files may be too large or the server is busy. Please try with fewer or smaller files.';
                 } else if (response.status >= 500) {
                     errorDetails = 'Server error occurred. Please try again in a moment.';
                 } else {
@@ -907,7 +907,7 @@ class MyAIGist {
                     summary_level: this.selectedSummaryLevel
                 });
                 
-                this.showStatus(`Successfully uploaded ${data.successful_uploads} files!`, 'success');
+                this.showStatus(`Successfully analyzed ${data.successful_uploads} document${data.successful_uploads > 1 ? 's' : ''}!`, 'success');
                 return true; // Return true to indicate success
 
             } else {
@@ -916,7 +916,7 @@ class MyAIGist {
 
         } catch (error) {
             console.error('❌ Multi-file upload error:', error);
-            this.showStatus(`Upload error: ${error.message}`, 'error');
+            this.showStatus(`Analysis error: ${error.message}`, 'error');
             return false; // Return false to indicate failure
         }
     }
