@@ -91,6 +91,29 @@ if all_agents_ready:
 else:
     print("⚠️  Some core agents failed to initialize - some features may not work")
 
+def create_text_document_title(session_qa, text):
+    """Create a smart title for text documents"""
+    user_id = get_user_identifier()
+    
+    # Count existing text documents for this user
+    text_doc_count = 0
+    if hasattr(session_qa.vector_store, 'metadata') and session_qa.vector_store.metadata:
+        for metadata in session_qa.vector_store.metadata:
+            if (metadata.get('user_id') == user_id and 
+                metadata.get('doc_title', '').startswith('Text Entry')):
+                text_doc_count += 1
+    
+    # Create title with preview
+    text_preview = text.strip()[:50]
+    if len(text.strip()) > 50:
+        text_preview += "..."
+    
+    # Remove newlines and clean up preview
+    text_preview = ' '.join(text_preview.split())
+    
+    title = f"Text Entry #{text_doc_count + 1}: {text_preview}"
+    return title
+
 def get_user_identifier():
     """Get consistent user ID across requests for multi-user isolation"""
     # Priority order:
@@ -270,7 +293,9 @@ def process_content():
                         print(f"📁 Vector store path: {session_qa.vector_store.persist_path}")
                         print(f"💾 Storing text for Q&A (length: {len(text)})")
                         
-                        qa_success = session_qa.add_document(text, 'User Text Input')
+                        # Create a smart title for text documents
+                        text_title = create_text_document_title(session_qa, text)
+                        qa_success = session_qa.add_document(text, text_title)
                         print(f"✅ QA storage result: {qa_success}")
                         
                         # Vector store automatically saves after adding documents
@@ -588,7 +613,6 @@ def qa_debug():
         status = session_qa.get_status()
         
         # Check file system
-        import os
         vector_file_exists = os.path.exists(session_qa.vector_store.persist_path)
         file_size = os.path.getsize(session_qa.vector_store.persist_path) if vector_file_exists else 0
         
@@ -612,6 +636,209 @@ def qa_debug():
             }
         })
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user-documents', methods=['GET'])
+def get_user_documents():
+    """Get list of documents for current user"""
+    try:
+        session_qa = get_session_qa_agent()
+        if not session_qa:
+            return jsonify({'error': 'QA agent not initialized'}), 500
+        
+        user_id = get_user_identifier()
+        
+        # Get user's documents from vector store metadata
+        user_docs = {}
+        if hasattr(session_qa.vector_store, 'metadata') and session_qa.vector_store.metadata:
+            for metadata in session_qa.vector_store.metadata:
+                if metadata.get('user_id') == user_id:
+                    doc_id = metadata.get('doc_id')
+                    if doc_id and doc_id not in user_docs:
+                        user_docs[doc_id] = {
+                            'doc_id': doc_id,
+                            'title': metadata.get('doc_title', 'Untitled'),
+                            'upload_time': metadata.get('upload_time'),
+                            'chunk_count': 0
+                        }
+                    if doc_id in user_docs:
+                        user_docs[doc_id]['chunk_count'] += 1
+        
+        documents = list(user_docs.values())
+        # Sort by upload time (most recent first)
+        documents.sort(key=lambda x: x.get('upload_time', ''), reverse=True)
+        
+        return jsonify({
+            'documents': documents,
+            'total_count': len(documents),
+            'user_id': user_id
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/delete-document', methods=['DELETE'])
+def delete_document():
+    """Delete a specific document for current user"""
+    try:
+        data = request.get_json()
+        doc_id = data.get('doc_id')
+        
+        if not doc_id:
+            return jsonify({'error': 'doc_id is required'}), 400
+        
+        session_qa = get_session_qa_agent()
+        if not session_qa:
+            return jsonify({'error': 'QA agent not initialized'}), 500
+        
+        user_id = get_user_identifier()
+        
+        # Load vector store to ensure we have latest data
+        if not hasattr(session_qa.vector_store, 'vectors') or not session_qa.vector_store.vectors:
+            session_qa.vector_store.load()
+        
+        # Check if document belongs to current user and exists
+        doc_exists = False
+        chunk_count = 0
+        if hasattr(session_qa.vector_store, 'metadata'):
+            for metadata in session_qa.vector_store.metadata:
+                if (metadata.get('user_id') == user_id and 
+                    metadata.get('doc_id') == doc_id):
+                    doc_exists = True
+                    chunk_count += 1
+        
+        if not doc_exists:
+            return jsonify({'error': 'Document not found or access denied'}), 404
+        
+        # Remove document using existing method
+        session_qa._remove_document_by_id(doc_id)
+        session_qa.vector_store.save()
+        
+        print(f"🗑️ Deleted document {doc_id} for user {user_id} ({chunk_count} chunks removed)")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Document deleted successfully',
+            'doc_id': doc_id,
+            'chunks_removed': chunk_count
+        })
+        
+    except Exception as e:
+        print(f"❌ Error deleting document: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/upload-multiple-files', methods=['POST'])
+def upload_multiple_files():
+    """Upload multiple files at once"""
+    try:
+        if 'files' not in request.files:
+            return jsonify({'error': 'No files uploaded'}), 400
+        
+        files = request.files.getlist('files')
+        if not files or all(file.filename == '' for file in files):
+            return jsonify({'error': 'No files selected'}), 400
+        
+        # Check file count limit
+        if len(files) > 5:
+            return jsonify({'error': 'Maximum 5 files allowed per upload'}), 400
+        
+        # Get optional parameters
+        summary_level = request.form.get('summary_level', 'standard')
+        voice = request.form.get('voice', 'nova')
+        
+        session_qa = get_session_qa_agent()
+        user_id = get_user_identifier()
+        
+        results = []
+        successful_uploads = 0
+        
+        for file in files:
+            if file.filename == '':
+                continue
+                
+            try:
+                filename = secure_filename(file.filename)
+                
+                # Check file type and size
+                if not allowed_file(file.filename):
+                    results.append({
+                        'filename': filename,
+                        'success': False,
+                        'error': 'File type not allowed'
+                    })
+                    continue
+                
+                # Process the file
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{uuid.uuid4()}_{filename}")
+                file.save(file_path)
+                
+                # Extract text using document processor
+                text = doc_processor.process_document(file_path)
+                
+                # Clean up uploaded file
+                os.remove(file_path)
+                
+                if not text or len(text.strip()) < 10:
+                    results.append({
+                        'filename': filename,
+                        'success': False,
+                        'error': 'Could not extract text from file'
+                    })
+                    continue
+                
+                # Generate summary
+                summary = summarizer.summarize(text, detail_level=summary_level)
+                
+                # Store for QA with enhanced debugging
+                qa_success = False
+                if session_qa:
+                    qa_success = session_qa.add_document(text, filename)
+                
+                results.append({
+                    'filename': filename,
+                    'success': True,
+                    'summary': summary,
+                    'text_length': len(text),
+                    'qa_stored': qa_success
+                })
+                
+                if qa_success:
+                    successful_uploads += 1
+                
+            except Exception as file_error:
+                results.append({
+                    'filename': file.filename,
+                    'success': False,
+                    'error': str(file_error)
+                })
+        
+        # Generate combined summary if multiple files uploaded successfully
+        combined_summary = None
+        audio_url = None
+        if successful_uploads > 1:
+            summaries = [r['summary'] for r in results if r['success'] and 'summary' in r]
+            if summaries:
+                combined_text = "\n\n---\n\n".join(summaries)
+                combined_summary = f"Successfully uploaded {successful_uploads} files with summaries:\n\n" + combined_text
+                
+                # Generate audio for combined summary
+                if tts_agent:
+                    try:
+                        audio_url = tts_agent.text_to_speech(combined_summary, voice=voice)
+                    except Exception as tts_error:
+                        print(f"⚠️ TTS failed: {tts_error}")
+        
+        return jsonify({
+            'success': successful_uploads > 0,
+            'results': results,
+            'successful_uploads': successful_uploads,
+            'total_files': len([f for f in files if f.filename != '']),
+            'combined_summary': combined_summary,
+            'audio_url': audio_url,
+            'user_id': user_id
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in multi-file upload: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/test-question', methods=['POST'])

@@ -8,10 +8,14 @@ class MyAIGist {
         this.currentRecordingBlob = null;
         this.selectedSummaryLevel = 'standard'; // Default to standard
         this.selectedVoice = 'nova'; // Default voice
+        this.selectedFiles = []; // For multi-file upload
+        this.userDocuments = []; // Track user's uploaded documents
 
         // Bind methods (extra safety against "not a function" if something rebinds context)
         this.processContent = this.processContent.bind(this);
         this.askQuestion = this.askQuestion.bind(this);
+        this.uploadMultipleFiles = this.uploadMultipleFiles.bind(this);
+        this.deleteDocument = this.deleteDocument.bind(this);
 
         this.init();
     }
@@ -22,6 +26,9 @@ class MyAIGist {
         this.setupTabs();
         this.setupSummaryLevels();
         this.setupVoiceSelection();
+        this.setupFileShelf();
+        this.setupMultiFileUpload();
+        this.loadUserDocuments();
 
         // Debug: list methods to ensure processContent exists
         const protoMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this));
@@ -452,6 +459,21 @@ class MyAIGist {
                 this.showStatus(`Content processed successfully with ${levelNames[this.selectedSummaryLevel]} summary! You can now ask questions.`, 'success');
                 console.log('✅ Content processed successfully, QA stored:', result.qa_stored);
 
+                // Clear text input for next entry if it was a text submission
+                const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+                if (activeTab === 'text') {
+                    const textInput = document.getElementById('text-input');
+                    if (textInput) {
+                        textInput.value = '';
+                        textInput.placeholder = 'Enter your next text here for AI analysis...';
+                    }
+                }
+
+                // Refresh file shelf if document was stored for QA
+                if (result.qa_stored) {
+                    setTimeout(() => this.loadUserDocuments(), 1000);
+                }
+
                 // Give backend a moment if needed
                 setTimeout(() => console.log('✅ Post-processing wait complete'), 1500);
 
@@ -580,10 +602,280 @@ class MyAIGist {
             setTimeout(() => statusEl.classList.add('hidden'), 5000);
         }
     }
+
+    // File Shelf Management
+    setupFileShelf() {
+        const shelfToggle = document.getElementById('shelf-toggle');
+        const fileShelf = document.getElementById('file-shelf');
+        
+        if (shelfToggle && fileShelf) {
+            shelfToggle.addEventListener('click', () => {
+                fileShelf.classList.toggle('minimized');
+                shelfToggle.textContent = fileShelf.classList.contains('minimized') ? '▶' : '◀';
+            });
+        }
+    }
+
+    async loadUserDocuments() {
+        try {
+            const response = await fetch('/api/user-documents');
+            const data = await response.json();
+            
+            if (data.documents) {
+                this.userDocuments = data.documents;
+                this.updateFileShelf();
+            }
+        } catch (error) {
+            console.error('❌ Error loading user documents:', error);
+        }
+    }
+
+    updateFileShelf() {
+        const fileList = document.getElementById('file-list');
+        const fileCountBadge = document.getElementById('file-count-badge');
+        
+        if (!fileList || !fileCountBadge) return;
+
+        fileCountBadge.textContent = this.userDocuments.length;
+
+        if (this.userDocuments.length === 0) {
+            fileList.innerHTML = '<li class="no-files-message">No documents uploaded yet</li>';
+            return;
+        }
+
+        fileList.innerHTML = this.userDocuments.map(doc => {
+            // Determine document type and icon
+            const isTextEntry = doc.title.startsWith('Text Entry');
+            const docIcon = isTextEntry ? '📝' : '📄';
+            const docType = isTextEntry ? 'Text' : 'File';
+            
+            // Format date nicely
+            const uploadDate = new Date(doc.upload_time);
+            const formattedDate = uploadDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            return `
+                <li class="file-item" data-doc-id="${doc.doc_id}">
+                    <div class="file-info">
+                        <div class="file-name">
+                            ${docIcon} ${doc.title}
+                        </div>
+                        <div class="file-meta">
+                            ${docType} • ${formattedDate} • ${doc.chunk_count} chunks
+                        </div>
+                    </div>
+                    <button class="file-delete" onclick="myAIGist.deleteDocument('${doc.doc_id}')" title="Delete document">
+                        ×
+                    </button>
+                </li>
+            `;
+        }).join('');
+    }
+
+    async deleteDocument(docId) {
+        if (!confirm('Are you sure you want to delete this document?')) {
+            return;
+        }
+
+        try {
+            this.showStatus('Deleting document...', 'loading');
+            
+            const response = await fetch('/api/delete-document', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ doc_id: docId })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.showStatus('Document deleted successfully!', 'success');
+                // Remove from local array
+                this.userDocuments = this.userDocuments.filter(doc => doc.doc_id !== docId);
+                this.updateFileShelf();
+                
+                // Track deletion event
+                this.trackEvent('document_deleted', {
+                    doc_id: docId,
+                    chunks_removed: data.chunks_removed
+                });
+            } else {
+                throw new Error(data.error || 'Failed to delete document');
+            }
+        } catch (error) {
+            console.error('❌ Delete document error:', error);
+            this.showStatus(`Error: ${error.message}`, 'error');
+        }
+    }
+
+    // Multi-File Upload Setup
+    setupMultiFileUpload() {
+        const multiFileInput = document.getElementById('multi-file-input');
+        const selectedFilesDiv = document.getElementById('selected-files');
+        const selectedFilesList = document.getElementById('selected-files-list');
+        const uploadBtn = document.getElementById('upload-multiple-btn');
+
+        if (multiFileInput) {
+            multiFileInput.addEventListener('change', (e) => {
+                this.selectedFiles = Array.from(e.target.files);
+                this.updateSelectedFilesList();
+            });
+        }
+
+        if (uploadBtn) {
+            uploadBtn.addEventListener('click', this.uploadMultipleFiles);
+        }
+    }
+
+    updateSelectedFilesList() {
+        const selectedFilesDiv = document.getElementById('selected-files');
+        const selectedFilesList = document.getElementById('selected-files-list');
+        const uploadBtn = document.getElementById('upload-multiple-btn');
+
+        if (!selectedFilesDiv || !selectedFilesList || !uploadBtn) return;
+
+        if (this.selectedFiles.length === 0) {
+            selectedFilesDiv.style.display = 'none';
+            uploadBtn.disabled = true;
+            return;
+        }
+
+        selectedFilesDiv.style.display = 'block';
+        uploadBtn.disabled = false;
+
+        selectedFilesList.innerHTML = this.selectedFiles.map((file, index) => `
+            <div class="selected-file-item">
+                <span class="selected-file-name">${file.name}</span>
+                <button class="remove-file" onclick="myAIGist.removeSelectedFile(${index})" title="Remove file">
+                    ×
+                </button>
+            </div>
+        `).join('');
+
+        // Update button text
+        uploadBtn.textContent = `🚀 Upload ${this.selectedFiles.length} File${this.selectedFiles.length > 1 ? 's' : ''}`;
+    }
+
+    removeSelectedFile(index) {
+        this.selectedFiles.splice(index, 1);
+        this.updateSelectedFilesList();
+        
+        // Update the file input
+        const multiFileInput = document.getElementById('multi-file-input');
+        if (multiFileInput && this.selectedFiles.length === 0) {
+            multiFileInput.value = '';
+        }
+    }
+
+    async uploadMultipleFiles() {
+        if (this.selectedFiles.length === 0) {
+            this.showStatus('Please select files first', 'error');
+            return;
+        }
+
+        if (this.selectedFiles.length > 5) {
+            this.showStatus('Maximum 5 files allowed', 'error');
+            return;
+        }
+
+        try {
+            this.showStatus(`Uploading ${this.selectedFiles.length} files...`, 'loading');
+
+            const formData = new FormData();
+            this.selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+            formData.append('summary_level', this.selectedSummaryLevel);
+            formData.append('voice', this.selectedVoice);
+
+            const response = await fetch('/api/upload-multiple-files', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.showStatus(`Successfully uploaded ${data.successful_uploads} files!`, 'success');
+                
+                // Clear selected files
+                this.selectedFiles = [];
+                this.updateSelectedFilesList();
+                document.getElementById('multi-file-input').value = '';
+
+                // Display results
+                this.displayMultiFileResults(data);
+                
+                // Refresh file shelf
+                await this.loadUserDocuments();
+
+                // Track successful multi-upload
+                this.trackEvent('multi_file_upload', {
+                    total_files: data.total_files,
+                    successful_uploads: data.successful_uploads,
+                    summary_level: this.selectedSummaryLevel
+                });
+
+            } else {
+                throw new Error(data.error || 'Upload failed');
+            }
+
+        } catch (error) {
+            console.error('❌ Multi-file upload error:', error);
+            this.showStatus(`Upload error: ${error.message}`, 'error');
+        }
+    }
+
+    displayMultiFileResults(data) {
+        // Show the summary section
+        const summarySection = document.getElementById('summary-section');
+        const summaryContent = document.getElementById('summary-content');
+        const summaryLevelIndicator = document.getElementById('summary-level-indicator');
+
+        if (summarySection && summaryContent && summaryLevelIndicator) {
+            summarySection.classList.remove('hidden');
+            summaryLevelIndicator.textContent = this.selectedSummaryLevel.charAt(0).toUpperCase() + 
+                                              this.selectedSummaryLevel.slice(1);
+
+            // Display combined summary or individual results
+            if (data.combined_summary) {
+                summaryContent.textContent = data.combined_summary;
+            } else {
+                // Display individual results
+                const resultsText = data.results
+                    .filter(r => r.success)
+                    .map(r => `📄 ${r.filename}:\n${r.summary}`)
+                    .join('\n\n---\n\n');
+                summaryContent.textContent = resultsText || 'Upload completed but no summaries generated.';
+            }
+
+            // Handle audio if available
+            if (data.audio_url) {
+                this.handleAudioResponse(data.audio_url);
+            }
+
+            // Show failed uploads if any
+            const failedUploads = data.results.filter(r => !r.success);
+            if (failedUploads.length > 0) {
+                const errorMsg = `Some files failed to upload:\n${failedUploads.map(f => `• ${f.filename}: ${f.error}`).join('\n')}`;
+                this.showStatus(errorMsg, 'error');
+            }
+        }
+
+        // Enable Q&A section
+        const qaSection = document.getElementById('qa-section');
+        if (qaSection) {
+            qaSection.classList.remove('hidden');
+        }
+    }
 }
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', () => {
     console.log('📱 DOM loaded, initializing MyAIGist...');
-    new MyAIGist();
+    window.myAIGist = new MyAIGist();
 });

@@ -51,6 +51,277 @@
             transform: translateY(-2px);
         }
         
+        /* File Shelf Styles */
+        .file-shelf {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(30, 30, 45, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0 15px 15px 0;
+            padding: 20px 10px;
+            max-width: 350px;
+            max-height: 70vh;
+            overflow-y: auto;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .file-shelf.minimized {
+            transform: translateY(-50%) translateX(-90%);
+            padding: 15px 5px;
+        }
+        
+        .file-shelf-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 0 10px;
+        }
+        
+        .file-shelf-title {
+            color: white;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .shelf-toggle {
+            background: none;
+            border: none;
+            color: #60a5fa;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+        }
+        
+        .shelf-toggle:hover {
+            background: rgba(96, 165, 250, 0.1);
+            transform: scale(1.1);
+        }
+        
+        .file-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .file-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .file-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(96, 165, 250, 0.3);
+            transform: translateX(5px);
+        }
+        
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .file-name {
+            color: white;
+            font-size: 0.9em;
+            font-weight: 500;
+            margin: 0 0 5px 0;
+            word-break: break-word;
+            line-height: 1.3;
+            display: flex;
+            align-items: flex-start;
+            gap: 5px;
+        }
+        
+        .file-meta {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.75em;
+            margin: 0;
+        }
+        
+        .file-delete {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+        
+        .file-delete:hover {
+            background: rgba(239, 68, 68, 0.4);
+            border-color: rgba(239, 68, 68, 0.5);
+            transform: scale(1.1);
+        }
+        
+        .file-shelf.minimized .file-shelf-title,
+        .file-shelf.minimized .file-list {
+            display: none;
+        }
+        
+        .file-shelf.minimized .shelf-toggle {
+            transform: rotate(180deg);
+        }
+        
+        .no-files-message {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-style: italic;
+            padding: 20px 10px;
+        }
+        
+        .file-count-badge {
+            background: #60a5fa;
+            color: white;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        /* Multiple file upload styles */
+        .multi-file-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 2px dashed rgba(96, 165, 250, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .multi-file-section:hover {
+            border-color: rgba(96, 165, 250, 0.5);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .multi-file-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .multi-file-title {
+            color: white;
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .multi-file-desc {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.95em;
+        }
+        
+        .file-input-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        
+        .file-input-label {
+            display: block;
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        
+        .file-input-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(96, 165, 250, 0.4);
+        }
+        
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .selected-files {
+            margin-top: 15px;
+        }
+        
+        .selected-file-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .selected-file-name {
+            color: white;
+            font-size: 0.9em;
+            flex: 1;
+            margin-right: 10px;
+            word-break: break-word;
+        }
+        
+        .remove-file {
+            background: rgba(239, 68, 68, 0.2);
+            border: none;
+            color: #f87171;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .upload-multiple-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-multiple-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+        }
+        
+        .upload-multiple-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
         /* Voice selector styling */
         .voice-options {
             margin: 20px 0;
@@ -104,6 +375,20 @@
     </style>
 </head>
 <body>
+    <!-- File Management Shelf -->
+    <div id="file-shelf" class="file-shelf minimized">
+        <div class="file-shelf-header">
+            <h3 class="file-shelf-title">
+                📁 Your Documents
+                <span id="file-count-badge" class="file-count-badge">0</span>
+            </h3>
+            <button id="shelf-toggle" class="shelf-toggle" title="Toggle file shelf">◀</button>
+        </div>
+        <ul id="file-list" class="file-list">
+            <li class="no-files-message">No documents uploaded yet</li>
+        </ul>
+    </div>
+
     <div class="container">
         <!-- Navigation Header -->
         <header class="nav-header">
@@ -139,12 +424,37 @@
 
                 <!-- File Upload -->
                 <div id="file-tab" class="tab-panel">
+                    <!-- Single File Upload -->
                     <div class="file-upload">
                         <input type="file" id="file-input" accept=".pdf,.docx,.txt" />
                         <label for="file-input">
                             📄 Choose Document (PDF, DOCX, TXT)
                         </label>
                         <span id="file-name" class="file-name">No file chosen</span>
+                    </div>
+                    
+                    <!-- Multi-File Upload Section -->
+                    <div class="multi-file-section">
+                        <div class="multi-file-header">
+                            <h3 class="multi-file-title">📚 Multiple Files Upload</h3>
+                            <p class="multi-file-desc">Upload up to 5 files at once for combined analysis</p>
+                        </div>
+                        
+                        <div class="file-input-container">
+                            <input type="file" id="multi-file-input" class="file-input" multiple accept=".pdf,.docx,.txt" />
+                            <label for="multi-file-input" class="file-input-label">
+                                📁 Select Multiple Files
+                            </label>
+                        </div>
+                        
+                        <div id="selected-files" class="selected-files" style="display: none;">
+                            <h4 style="color: white; margin-bottom: 10px;">Selected Files:</h4>
+                            <div id="selected-files-list"></div>
+                        </div>
+                        
+                        <button id="upload-multiple-btn" class="upload-multiple-btn" disabled>
+                            🚀 Upload Selected Files
+                        </button>
                     </div>
                 </div>
             </div>
