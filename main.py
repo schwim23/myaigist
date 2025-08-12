@@ -759,11 +759,13 @@ def upload_multiple_files():
                 filename = secure_filename(file.filename)
                 
                 # Check file type and size
-                if not allowed_file(file.filename):
+                allowed_extensions = {'.pdf', '.docx', '.txt'}
+                file_ext = os.path.splitext(filename.lower())[1]
+                if file_ext not in allowed_extensions:
                     results.append({
                         'filename': filename,
                         'success': False,
-                        'error': 'File type not allowed'
+                        'error': 'File type not allowed. Supported: PDF, DOCX, TXT'
                     })
                     continue
                 
@@ -772,7 +774,7 @@ def upload_multiple_files():
                 file.save(file_path)
                 
                 # Extract text using document processor
-                text = doc_processor.process_document(file_path)
+                text = doc_processor.extract_text(file_path)
                 
                 # Clean up uploaded file
                 os.remove(file_path)
