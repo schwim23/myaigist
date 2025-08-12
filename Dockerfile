@@ -29,4 +29,4 @@ ENV FLASK_ENV=production
 EXPOSE 8000
 
 # Use gunicorn for production deployment
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "main:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "300", "main:app"]
