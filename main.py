@@ -728,7 +728,7 @@ def delete_document():
 
 @app.route('/api/upload-multiple-files', methods=['POST'])
 def upload_multiple_files():
-    """Upload multiple files at once"""
+    """Upload multiple files at once with optimized batch processing"""
     try:
         if 'files' not in request.files:
             return jsonify({'error': 'No files uploaded'}), 400
@@ -748,69 +748,182 @@ def upload_multiple_files():
         session_qa = get_session_qa_agent()
         user_id = get_user_identifier()
         
-        results = []
-        successful_uploads = 0
-        
+        # Phase 1: Extract and validate all files first
+        print("📄 Phase 1: Extracting text from all files...")
+        file_data = []
         for file in files:
             if file.filename == '':
                 continue
                 
+            filename = secure_filename(file.filename)
+            
+            # Check file type
+            allowed_extensions = {'.pdf', '.docx', '.txt'}
+            file_ext = os.path.splitext(filename.lower())[1]
+            if file_ext not in allowed_extensions:
+                file_data.append({
+                    'filename': filename,
+                    'success': False,
+                    'error': 'File type not allowed. Supported: PDF, DOCX, TXT'
+                })
+                continue
+            
             try:
-                filename = secure_filename(file.filename)
-                
-                # Check file type and size
-                allowed_extensions = {'.pdf', '.docx', '.txt'}
-                file_ext = os.path.splitext(filename.lower())[1]
-                if file_ext not in allowed_extensions:
-                    results.append({
-                        'filename': filename,
-                        'success': False,
-                        'error': 'File type not allowed. Supported: PDF, DOCX, TXT'
-                    })
-                    continue
-                
-                # Process the file
+                # Save and extract text
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{uuid.uuid4()}_{filename}")
                 file.save(file_path)
-                
-                # Extract text using document processor
                 text = doc_processor.extract_text(file_path)
-                
-                # Clean up uploaded file
                 os.remove(file_path)
                 
                 if not text or len(text.strip()) < 10:
-                    results.append({
+                    file_data.append({
                         'filename': filename,
                         'success': False,
                         'error': 'Could not extract text from file'
                     })
                     continue
                 
-                # Generate summary
-                summary = summarizer.summarize(text, detail_level=summary_level)
-                
-                # Store for QA with enhanced debugging
-                qa_success = False
-                if session_qa:
-                    qa_success = session_qa.add_document(text, filename)
-                
-                results.append({
+                file_data.append({
                     'filename': filename,
-                    'success': True,
-                    'summary': summary,
-                    'text_length': len(text),
-                    'qa_stored': qa_success
+                    'text': text,
+                    'success': True
                 })
                 
-                if qa_success:
-                    successful_uploads += 1
-                
-            except Exception as file_error:
-                results.append({
-                    'filename': file.filename,
+            except Exception as e:
+                file_data.append({
+                    'filename': filename,
                     'success': False,
-                    'error': str(file_error)
+                    'error': str(e)
+                })
+        
+        # Filter successful extractions
+        valid_files = [f for f in file_data if f.get('success', False)]
+        if not valid_files:
+            return jsonify({
+                'success': False,
+                'results': file_data,
+                'successful_uploads': 0,
+                'total_files': len(file_data),
+                'error': 'No files could be processed'
+            })
+        
+        print(f"✅ Successfully extracted text from {len(valid_files)} files")
+        
+        # Phase 2: Batch generate summaries
+        print("📋 Phase 2: Batch generating summaries...")
+        texts_for_summary = [f['text'] for f in valid_files]
+        
+        # Generate summaries (could be optimized to batch if summarizer supports it)
+        for i, file_entry in enumerate(valid_files):
+            try:
+                summary = summarizer.summarize(file_entry['text'], detail_level=summary_level)
+                file_entry['summary'] = summary
+            except Exception as e:
+                print(f"⚠️ Summary generation failed for {file_entry['filename']}: {e}")
+                file_entry['summary'] = f"Summary generation failed: {str(e)}"
+        
+        # Phase 3: Optimized batch document storage
+        print("🔄 Phase 3: Batch storing documents for Q&A...")
+        successful_uploads = 0
+        
+        if session_qa:
+            # Load existing vector store once
+            if not hasattr(session_qa.vector_store, 'vectors') or not session_qa.vector_store.vectors:
+                session_qa.vector_store.load()
+            
+            # Clean up user documents once
+            session_qa._cleanup_user_documents()
+            
+            # Collect all chunks from all documents for batch embedding
+            all_chunks = []
+            chunk_metadata = []
+            
+            for file_entry in valid_files:
+                try:
+                    # Clean and chunk text
+                    cleaned_text = session_qa._clean_text(file_entry['text'])
+                    chunks = session_qa._chunk_text(cleaned_text)
+                    
+                    if chunks:
+                        doc_id = str(uuid.uuid4())
+                        upload_time = datetime.now().isoformat()
+                        
+                        # Add document to session
+                        document = {
+                            'doc_id': doc_id,
+                            'user_id': user_id,
+                            'text': cleaned_text,
+                            'title': file_entry['filename'],
+                            'chunks': chunks,
+                            'upload_time': upload_time
+                        }
+                        session_qa.documents.append(document)
+                        
+                        # Collect chunks for batch processing
+                        for chunk_index, chunk in enumerate(chunks):
+                            all_chunks.append(chunk)
+                            chunk_metadata.append({
+                                'user_id': user_id,
+                                'doc_id': doc_id,
+                                'chunk_index': chunk_index,
+                                'title': file_entry['filename'],
+                                'doc_title': file_entry['filename'],
+                                'upload_time': upload_time,
+                                'text': chunk[:100] + '...' if len(chunk) > 100 else chunk
+                            })
+                        
+                        file_entry['qa_stored'] = True
+                        file_entry['doc_id'] = doc_id
+                        successful_uploads += 1
+                    else:
+                        file_entry['qa_stored'] = False
+                        
+                except Exception as e:
+                    print(f"❌ Error processing {file_entry['filename']}: {e}")
+                    file_entry['qa_stored'] = False
+            
+            # Batch create embeddings for all chunks at once
+            if all_chunks:
+                print(f"🚀 Creating embeddings for {len(all_chunks)} chunks in batch...")
+                embeddings = session_qa.vector_store.embedder.create_embeddings_batch(all_chunks)
+                
+                # Add vectors to store with metadata
+                for i, (embedding, metadata) in enumerate(zip(embeddings, chunk_metadata)):
+                    if embedding:
+                        vector = __import__('numpy').array(embedding, dtype=__import__('numpy').float32)
+                        vector_id = f"vec_{len(session_qa.vector_store.vectors)}"
+                        metadata_with_id = {'id': vector_id, 'text': all_chunks[i], **metadata}
+                        
+                        session_qa.vector_store.vectors.append(vector)
+                        session_qa.vector_store.metadata.append(metadata_with_id)
+                
+                # Set dimension on first embedding
+                if session_qa.vector_store.dimension is None and embeddings:
+                    for emb in embeddings:
+                        if emb:
+                            session_qa.vector_store.dimension = len(emb)
+                            break
+                
+                # Save vector store once
+                session_qa.vector_store.save()
+                print(f"✅ Batch processing complete: {len(all_chunks)} chunks processed")
+        
+        # Update results for failed extractions
+        results = []
+        for file_entry in file_data:
+            if file_entry.get('success', False):
+                results.append({
+                    'filename': file_entry['filename'],
+                    'success': True,
+                    'summary': file_entry.get('summary', 'Summary not available'),
+                    'text_length': len(file_entry.get('text', '')),
+                    'qa_stored': file_entry.get('qa_stored', False)
+                })
+            else:
+                results.append({
+                    'filename': file_entry['filename'],
+                    'success': False,
+                    'error': file_entry.get('error', 'Unknown error')
                 })
         
         # Generate combined summary if multiple files uploaded successfully
@@ -833,7 +946,7 @@ def upload_multiple_files():
             'success': successful_uploads > 0,
             'results': results,
             'successful_uploads': successful_uploads,
-            'total_files': len([f for f in files if f.filename != '']),
+            'total_files': len([f for f in file_data if f.get('filename')]),
             'combined_summary': combined_summary,
             'audio_url': audio_url,
             'user_id': user_id
@@ -841,6 +954,8 @@ def upload_multiple_files():
         
     except Exception as e:
         print(f"❌ Error in multi-file upload: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/test-question', methods=['POST'])
