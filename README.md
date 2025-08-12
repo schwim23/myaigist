@@ -71,7 +71,7 @@
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/yourusername/myaigist.git
+git clone https://github.com/schwim23/myaigist.git
 cd myaigist
 ```
 
@@ -475,8 +475,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **🐛 Bug Reports**: [GitHub Issues](https://github.com/yourusername/myaigist/issues)
-- **💡 Feature Requests**: [GitHub Discussions](https://github.com/yourusername/myaigist/discussions)
+- **🐛 Bug Reports**: [GitHub Issues](https://github.com/schwim23/myaigist/issues)
+- **💡 Feature Requests**: [GitHub Discussions](https://github.com/schwim23/myaigist/discussions)
 - **📖 Documentation**: Check project files and code comments
 - **💬 Questions**: Open a discussion or issue
 
