@@ -38,6 +38,20 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 24 * 60 * 60  # 24 hours
 # Ensure directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs('static/audio', exist_ok=True)
+os.makedirs('data', exist_ok=True)  # Ensure data directory for vector stores exists
+
+# Check if we can write to the data directory (important for EFS)
+try:
+    test_file = 'data/test_write_permissions.tmp'
+    with open(test_file, 'w') as f:
+        f.write('test')
+    os.remove(test_file)
+    print("✅ Data directory is writable")
+except Exception as e:
+    print(f"❌ Data directory write test failed: {e}")
+    print(f"📁 Data directory permissions: {oct(os.stat('data').st_mode)[-3:]}")
+    print(f"📂 Current working directory: {os.getcwd()}")
+    print(f"👤 Process user: {os.getuid()}")
 
 # Initialize agents with proper error handling
 doc_processor = None

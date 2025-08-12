@@ -156,19 +156,39 @@ class VectorStore:
     def save(self):
         """Save vector store to disk"""
         try:
+            # Ensure parent directory exists
+            self.persist_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            print(f"📁 Saving vector store to: {self.persist_path}")
+            print(f"📊 Data to save: {len(self.vectors)} vectors, {len(self.metadata)} metadata entries")
+            
             data = {
                 'vectors': self.vectors,
                 'metadata': self.metadata,
                 'dimension': self.dimension
             }
             
+            # Check if directory is writable
+            if not os.access(self.persist_path.parent, os.W_OK):
+                print(f"❌ Directory {self.persist_path.parent} is not writable!")
+                print(f"📁 Directory permissions: {oct(os.stat(self.persist_path.parent).st_mode)[-3:]}")
+                return
+            
             with open(self.persist_path, 'wb') as f:
                 pickle.dump(data, f)
             
-            print(f"💾 Saved vector store to {self.persist_path} ({len(self.vectors)} vectors)")
+            # Verify file was created and get size
+            if os.path.exists(self.persist_path):
+                file_size = os.path.getsize(self.persist_path)
+                print(f"✅ Successfully saved vector store to {self.persist_path}")
+                print(f"📦 File size: {file_size} bytes, {len(self.vectors)} vectors")
+            else:
+                print(f"❌ Vector store file was not created at {self.persist_path}")
             
         except Exception as e:
             print(f"❌ Error saving vector store: {e}")
+            import traceback
+            traceback.print_exc()
     
     def load(self):
         """Load vector store from disk"""
