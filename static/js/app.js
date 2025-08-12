@@ -837,24 +837,49 @@ class MyAIGist {
             console.log('📡 Response status:', response.status);
 
             if (!response.ok) {
-                let errorDetails = '';
-                try {
-                    const errorText = await response.text();
-                    console.error('❌ Upload failed - Raw response:', errorText);
-                    
-                    // Try to parse as JSON for detailed error
+                let errorDetails = `HTTP ${response.status} ${response.statusText}`;
+                
+                // Handle specific error types
+                if (response.status === 504) {
+                    errorDetails = 'Upload timed out. The files may be too large or the server is busy. Please try with fewer or smaller files.';
+                } else if (response.status >= 500) {
+                    errorDetails = 'Server error occurred. Please try again in a moment.';
+                } else {
+                    // Try to get more detailed error info for 4xx errors
                     try {
-                        const errorData = JSON.parse(errorText);
-                        errorDetails = errorData.error || errorText;
-                        console.error('❌ Upload failed - Parsed error:', errorData);
-                    } catch (parseError) {
-                        errorDetails = errorText;
+                        const errorText = await response.text();
+                        
+                        // Only try JSON parsing if the response looks like JSON
+                        if (errorText.trim().startsWith('{') || errorText.trim().startsWith('[')) {
+                            try {
+                                const errorData = JSON.parse(errorText);
+                                errorDetails = errorData.error || errorData.message || errorDetails;
+                            } catch (parseError) {
+                                console.warn('⚠️ Could not parse error response as JSON, using raw text');
+                                // Use a clean excerpt of the HTML error if it's HTML
+                                if (errorText.includes('<title>') && errorText.includes('</title>')) {
+                                    const titleMatch = errorText.match(/<title>(.*?)<\/title>/);
+                                    errorDetails = titleMatch ? titleMatch[1] : errorDetails;
+                                } else {
+                                    errorDetails = errorText.substring(0, 200) + (errorText.length > 200 ? '...' : '');
+                                }
+                            }
+                        } else if (errorText.includes('<title>') && errorText.includes('</title>')) {
+                            // Extract title from HTML error pages
+                            const titleMatch = errorText.match(/<title>(.*?)<\/title>/);
+                            errorDetails = titleMatch ? titleMatch[1] : errorDetails;
+                        } else {
+                            // Use a clean excerpt for other response types
+                            errorDetails = errorText.substring(0, 200) + (errorText.length > 200 ? '...' : '');
+                        }
+                    } catch (readError) {
+                        console.warn('⚠️ Could not read error response:', readError.message);
+                        // Keep the default HTTP status message
                     }
-                } catch (readError) {
-                    errorDetails = `Unable to read error response: ${readError.message}`;
                 }
                 
-                throw new Error(`Upload failed (${response.status}): ${errorDetails}`);
+                console.error('❌ Upload failed:', errorDetails);
+                throw new Error(errorDetails);
             }
 
             const data = await response.json();
