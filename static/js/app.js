@@ -449,6 +449,9 @@ class MyAIGist {
             if (result.success) {
                 this.showSummary(result.summary, result.audio_url, this.selectedSummaryLevel);
                 
+                // Get active tab for tracking and text clearing
+                const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+                
                 // Track summarization event
                 this.trackEvent('content_summarized', {
                     content_type: activeTab,
@@ -460,7 +463,6 @@ class MyAIGist {
                 console.log('✅ Content processed successfully, QA stored:', result.qa_stored);
 
                 // Clear text input for next entry if it was a text submission
-                const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
                 if (activeTab === 'text') {
                     const textInput = document.getElementById('text-input');
                     if (textInput) {
@@ -772,32 +774,65 @@ class MyAIGist {
     }
 
     async uploadMultipleFiles() {
-        if (this.selectedFiles.length === 0) {
-            this.showStatus('Please select files first', 'error');
-            return;
-        }
-
-        if (this.selectedFiles.length > 5) {
-            this.showStatus('Maximum 5 files allowed', 'error');
-            return;
-        }
-
         try {
+            console.log('🚀 Starting multi-file upload...');
+            console.log('📁 Selected files:', this.selectedFiles.map(f => f.name));
+
+            if (this.selectedFiles.length === 0) {
+                this.showStatus('Please select files first', 'error');
+                return;
+            }
+
+            if (this.selectedFiles.length > 5) {
+                this.showStatus('Maximum 5 files allowed', 'error');
+                return;
+            }
+
+            // Validate file sizes and types
+            for (const file of this.selectedFiles) {
+                if (file.size > 50 * 1024 * 1024) { // 50MB limit
+                    this.showStatus(`File "${file.name}" is too large (max 50MB)`, 'error');
+                    return;
+                }
+                
+                const allowedTypes = ['.pdf', '.docx', '.txt'];
+                const hasValidExtension = allowedTypes.some(ext => 
+                    file.name.toLowerCase().endsWith(ext)
+                );
+                
+                if (!hasValidExtension) {
+                    this.showStatus(`File "${file.name}" has unsupported format. Allowed: PDF, DOCX, TXT`, 'error');
+                    return;
+                }
+            }
+
             this.showStatus(`Uploading ${this.selectedFiles.length} files...`, 'loading');
 
             const formData = new FormData();
             this.selectedFiles.forEach(file => {
+                console.log(`📄 Adding file: ${file.name} (${file.size} bytes)`);
                 formData.append('files', file);
             });
             formData.append('summary_level', this.selectedSummaryLevel);
             formData.append('voice', this.selectedVoice);
 
+            console.log('📡 Sending multi-file upload request...');
+            
             const response = await fetch('/api/upload-multiple-files', {
                 method: 'POST',
                 body: formData
             });
 
+            console.log('📡 Response status:', response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Upload failed:', errorText);
+                throw new Error(`Upload failed (${response.status}): ${errorText}`);
+            }
+
             const data = await response.json();
+            console.log('✅ Upload response:', data);
 
             if (data.success) {
                 this.showStatus(`Successfully uploaded ${data.successful_uploads} files!`, 'success');

@@ -57,22 +57,25 @@
             left: 0;
             top: 50%;
             transform: translateY(-50%);
-            background: rgba(30, 30, 45, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 0 15px 15px 0;
-            padding: 20px 10px;
-            max-width: 350px;
-            max-height: 70vh;
+            background: rgba(20, 20, 35, 0.98);
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(96, 165, 250, 0.2);
+            border-left: none;
+            border-radius: 0 20px 20px 0;
+            padding: 25px 15px;
+            min-width: 320px;
+            max-width: 380px;
+            max-height: 75vh;
             overflow-y: auto;
             z-index: 1000;
             transition: all 0.3s ease;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
         }
         
         .file-shelf.minimized {
-            transform: translateY(-50%) translateX(-90%);
-            padding: 15px 5px;
+            transform: translateY(-50%) translateX(-85%);
+            padding: 20px 8px;
+            min-width: auto;
         }
         
         .file-shelf-header {
@@ -271,7 +274,8 @@
         }
         
         .selected-file-item {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(30, 30, 45, 0.8);
+            border: 1px solid rgba(96, 165, 250, 0.3);
             border-radius: 8px;
             padding: 10px 15px;
             margin-bottom: 8px;
@@ -281,11 +285,13 @@
         }
         
         .selected-file-name {
-            color: white;
+            color: #ffffff;
             font-size: 0.9em;
+            font-weight: 500;
             flex: 1;
             margin-right: 10px;
             word-break: break-word;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
         
         .remove-file {
