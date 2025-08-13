@@ -230,6 +230,13 @@ def about():
     ga_measurement_id = os.getenv('GA_MEASUREMENT_ID')
     return render_template('about.html', ga_measurement_id=ga_measurement_id)
 
+@app.route('/terms')
+def terms():
+    """Serve the Terms of Service page"""
+    print("📜 Serving terms.html")
+    ga_measurement_id = os.getenv('GA_MEASUREMENT_ID')
+    return render_template('terms.html', ga_measurement_id=ga_measurement_id)
+
 # Favicon route
 @app.route('/favicon.ico')
 def favicon():
