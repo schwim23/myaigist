@@ -582,7 +582,16 @@ class MyAIGist {
         const levelBadge = document.getElementById('summary-level-indicator');
 
         if (summaryText) summaryText.textContent = summary;
-        if (audioUrl && summaryAudio) summaryAudio.src = audioUrl;
+        
+        // Handle audio URL - show/hide audio element based on availability
+        if (summaryAudio) {
+            if (audioUrl) {
+                summaryAudio.src = audioUrl;
+                summaryAudio.style.display = 'block';
+            } else {
+                summaryAudio.style.display = 'none';
+            }
+        }
 
         const levelNames = { quick: 'Quick', standard: 'Standard', detailed: 'Detailed' };
         if (levelBadge) levelBadge.textContent = levelNames[level] || 'Standard';
@@ -817,7 +826,7 @@ class MyAIGist {
                 }
             }
 
-            this.showStatus(`Analyzing ${this.selectedFiles.length} document${this.selectedFiles.length > 1 ? 's' : ''}...`, 'loading');
+            this.showStatus(`Processing ${this.selectedFiles.length} document${this.selectedFiles.length > 1 ? 's' : ''}...`, 'loading');
 
             const formData = new FormData();
             this.selectedFiles.forEach(file => {
@@ -886,7 +895,9 @@ class MyAIGist {
             console.log('✅ Upload response:', data);
 
             if (data.success) {
-                this.showSummary(data.combined_summary || 'Multiple files processed successfully', data.audio_url, this.selectedSummaryLevel);
+                // Phase 1: Show summary immediately for responsive feel
+                const summaryText = data.combined_summary || 'Multiple files processed successfully';
+                this.showSummary(summaryText, null, this.selectedSummaryLevel); // No audio yet
                 
                 // Clear selected files
                 this.selectedFiles = [];
@@ -908,16 +919,69 @@ class MyAIGist {
                 });
                 
                 this.showStatus(`Successfully analyzed ${data.successful_uploads} document${data.successful_uploads > 1 ? 's' : ''}!`, 'success');
+                
+                // Phase 2: Generate audio in background (if there's text to convert)
+                if (summaryText && summaryText !== 'Multiple files processed successfully') {
+                    this.generateAudioInBackground(summaryText, data.voice || this.selectedVoice);
+                }
+                
                 return true; // Return true to indicate success
 
             } else {
-                throw new Error(data.error || 'Upload failed');
+                throw new Error(data.error || 'Analysis failed');
             }
 
         } catch (error) {
             console.error('❌ Multi-file upload error:', error);
             this.showStatus(`Analysis error: ${error.message}`, 'error');
             return false; // Return false to indicate failure
+        }
+    }
+
+    async generateAudioInBackground(text, voice) {
+        // Generate audio for text in the background and update UI when ready
+        try {
+            console.log('🎵 Generating audio in background...');
+            
+            // Update status to show audio is being generated
+            const currentStatus = document.getElementById('status');
+            const originalStatus = currentStatus ? currentStatus.textContent : '';
+            this.showStatus('Generating audio...', 'loading');
+            
+            const response = await fetch('/api/generate-audio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, voice })
+            });
+
+            if (response.ok) {
+                const audioData = await response.json();
+                if (audioData.success && audioData.audio_url) {
+                    // Update the summary section with audio
+                    const summaryAudio = document.getElementById('summary-audio');
+                    if (summaryAudio) {
+                        summaryAudio.src = audioData.audio_url;
+                        summaryAudio.style.display = 'block';
+                        console.log('✅ Audio generated and added to summary');
+                    }
+                }
+            } else {
+                console.warn('⚠️ Audio generation failed, continuing without audio');
+            }
+            
+            // Restore original status or clear loading status
+            if (originalStatus && !originalStatus.includes('loading')) {
+                this.showStatus(originalStatus, 'success');
+            } else {
+                // Hide status after a short delay if it was just the loading message
+                setTimeout(() => {
+                    if (currentStatus) currentStatus.classList.add('hidden');
+                }, 2000);
+            }
+            
+        } catch (error) {
+            console.warn('⚠️ Background audio generation failed:', error.message);
+            // Don't show error to user since audio is optional
         }
     }
 

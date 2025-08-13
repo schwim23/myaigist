@@ -928,34 +928,61 @@ def upload_multiple_files():
         
         # Generate combined summary if multiple files uploaded successfully
         combined_summary = None
-        audio_url = None
         if successful_uploads > 1:
             summaries = [r['summary'] for r in results if r['success'] and 'summary' in r]
             if summaries:
                 combined_text = "\n\n---\n\n".join(summaries)
-                combined_summary = f"Successfully uploaded {successful_uploads} files with summaries:\n\n" + combined_text
-                
-                # Generate audio for combined summary
-                if transcriber:
-                    try:
-                        audio_url = transcriber.text_to_speech(combined_summary, voice=voice)
-                    except Exception as tts_error:
-                        print(f"⚠️ TTS failed: {tts_error}")
+                combined_summary = f"Successfully analyzed {successful_uploads} files with summaries:\n\n" + combined_text
         
+        # Return response immediately with summary, audio will be generated separately
         return jsonify({
             'success': successful_uploads > 0,
             'results': results,
             'successful_uploads': successful_uploads,
             'total_files': len([f for f in file_data if f.get('filename')]),
             'combined_summary': combined_summary,
-            'audio_url': audio_url,
-            'user_id': user_id
+            'audio_url': None,  # Will be generated separately
+            'user_id': user_id,
+            'voice': voice  # Include voice for audio generation
         })
         
     except Exception as e:
         print(f"❌ Error in multi-file upload: {e}")
         import traceback
         traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/generate-audio', methods=['POST'])
+def generate_audio():
+    """Generate audio for text content (used for progressive UI updates)"""
+    try:
+        if not transcriber:
+            return jsonify({'error': 'Text-to-speech not available'}), 500
+        
+        data = request.get_json()
+        text = data.get('text')
+        voice = data.get('voice', 'nova')
+        
+        if not text:
+            return jsonify({'error': 'No text provided'}), 400
+        
+        print(f"🔊 Generating audio for text ({len(text)} chars) with voice: {voice}")
+        
+        try:
+            audio_url = transcriber.text_to_speech(text, voice=voice)
+            return jsonify({
+                'success': True,
+                'audio_url': audio_url
+            })
+        except Exception as tts_error:
+            print(f"⚠️ TTS generation failed: {tts_error}")
+            return jsonify({
+                'success': False,
+                'error': f'Audio generation failed: {str(tts_error)}'
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ Error in audio generation: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/test-question', methods=['POST'])
