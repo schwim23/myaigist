@@ -405,6 +405,56 @@
             100% { transform: rotate(360deg); }
         }
         
+        /* Summary action buttons styling */
+        .summary-actions {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+        
+        .action-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            text-decoration: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .copy-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+        
+        .copy-btn:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        .email-btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+        
+        .email-btn:hover {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .action-btn:active {
+            transform: translateY(0);
+        }
+        
         @media (max-width: 768px) {
             .nav-header {
                 flex-direction: column;
@@ -546,6 +596,14 @@
                 <span id="summary-level-indicator" class="summary-level-badge">Standard</span>
             </div>
             <div id="summary-text" class="summary-text"></div>
+            <div id="summary-actions" class="summary-actions hidden">
+                <button id="copy-summary-btn" class="action-btn copy-btn" title="Copy summary to clipboard">
+                    📋 Copy Summary
+                </button>
+                <button id="email-summary-btn" class="action-btn email-btn" title="Email summary">
+                    ✉️ Email Summary
+                </button>
+            </div>
             <div id="audio-loading" class="audio-loading hidden">
                 <div class="audio-loading-content">
                     <div class="loading-spinner"></div>

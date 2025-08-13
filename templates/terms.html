@@ -6,25 +6,116 @@
     <title>Terms of Service - MyAIGist</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
+    <!-- Google Analytics -->
+    {% if ga_measurement_id %}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '{{ ga_measurement_id }}');
+        
+        // Make gtag available globally for event tracking
+        window.gtag = gtag;
+    </script>
+    {% endif %}
+    
+    <style>
+        .nav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .about-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .about-section h2 {
+            color: #667eea;
+            margin: 30px 0 15px 0;
+        }
+        
+        .about-section h3 {
+            color: #667eea;
+            margin: 25px 0 15px 0;
+        }
+        
+        .about-section p {
+            color: #495057;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .about-section ul {
+            color: #495057;
+            line-height: 1.6;
+            margin: 15px 0 15px 30px;
+        }
+        
+        .about-section li {
+            margin-bottom: 8px;
+        }
+        
+        .about-section strong {
+            color: #343a40;
+        }
+        
+        @media (max-width: 768px) {
+            .nav-header {
+                flex-direction: column;
+                gap: 20px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <header style="text-align: center; margin-bottom: 40px;">
+        <!-- Navigation Header -->
+        <header class="nav-header">
             <div class="logo">
-                <div style="width:60px;height:60px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:2rem;font-weight:bold;margin:0 auto 20px;">🧠</div>
+                <div style="width:60px;height:60px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:2rem;font-weight:bold;">🧠</div>
                 <h1 style="color: white;">MyAIGist</h1>
             </div>
-            <nav style="margin-top: 20px;">
-                <a href="/" style="color: #60a5fa; text-decoration: none; margin: 0 15px;">← Back to Home</a>
-                <a href="/about" style="color: #60a5fa; text-decoration: none; margin: 0 15px;">About</a>
+            <nav class="nav-links">
+                <a href="/">🏠 Home</a>
+                <a href="/about">ℹ️ About</a>
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLSdCLBOSFTJoIX4Wh6X0Umg4Fxr0JZdz2G-Z7VKtG7sOef-DXg/viewform" target="_blank">💬 Feedback</a>
             </nav>
         </header>
 
-        <div style="background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 40px; margin-bottom: 40px;">
-            <h1 style="color: white; font-size: 2.5em; margin-bottom: 30px; text-align: center;">Terms of Service</h1>
-            
-            <div style="color: white; line-height: 1.6; font-size: 1.1em;">
-                <p style="margin-bottom: 20px;"><strong>Effective Date:</strong> August 12, 2025</p>
+        <!-- Terms of Service Section -->
+        <section class="about-section">
+            <h2 style="text-align: center; color: #667eea; font-size: 2.2em; margin-bottom: 20px;">📜 Terms of Service</h2>
+            <p style="text-align: center; margin-bottom: 30px;"><strong>Effective Date:</strong> August 12, 2025</p>
                 
                 <h2 style="color: #60a5fa; margin: 30px 0 15px 0;">1. Acceptance of Terms</h2>
                 <p>By accessing and using MyAIGist ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.</p>
@@ -77,16 +168,50 @@
                 <h2 style="color: #60a5fa; margin: 30px 0 15px 0;">10. Governing Law</h2>
                 <p>These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which the Service is operated, without regard to its conflict of law provisions.</p>
 
-                <h2 style="color: #60a5fa; margin: 30px 0 15px 0;">11. Contact Information</h2>
-                <p>If you have any questions about these Terms of Service, please contact us through our feedback form or support channels.</p>
+            <h2 style="color: #667eea; margin: 30px 0 15px 0;">11. Contact Information</h2>
+            <p>If you have any questions about these Terms of Service, please contact us through our feedback form or support channels.</p>
 
-                <hr style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 40px 0;">
-                
-                <p style="text-align: center; color: rgba(255, 255, 255, 0.7); font-size: 0.9em;">
-                    By using MyAIGist, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
-                </p>
-            </div>
-        </div>
+            <hr style="border: none; border-top: 1px solid #e9ecef; margin: 40px 0;">
+            
+            <p style="text-align: center; color: #6c757d; font-size: 0.9em; font-style: italic;">
+                By using MyAIGist, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
+            </p>
+        </section>
+
+        <footer style="text-align: center; margin: 40px 0; color: white; opacity: 0.8;">
+            <p>© 2025 MyAIGist. Built with OpenAI, Flask, and deployed on AWS Fargate.</p>
+            <p style="font-size: 0.9rem; margin-top: 10px;">
+                <a href="/" style="color: white;">Home</a> • 
+                <a href="/about" style="color: white;">About</a> • 
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLSdCLBOSFTJoIX4Wh6X0Umg4Fxr0JZdz2G-Z7VKtG7sOef-DXg/viewform" target="_blank" style="color: white;">Feedback</a> • 
+                <a href="https://github.com/schwim23/myaigist" target="_blank" style="color: white;">GitHub</a>
+            </p>
+        </footer>
     </div>
+
+    <script>
+        // Google Analytics event tracking
+        function trackEvent(eventName, parameters = {}) {
+            if (typeof window.gtag === 'function') {
+                window.gtag('event', eventName, parameters);
+            }
+        }
+
+        // Track page visit
+        trackEvent('page_view', {
+            page_title: 'Terms of Service',
+            page_location: window.location.href
+        });
+
+        // Track external link clicks
+        document.querySelectorAll('a[target="_blank"]').forEach(link => {
+            link.addEventListener('click', function() {
+                trackEvent('external_link_click', {
+                    link_url: this.href,
+                    link_text: this.textContent
+                });
+            });
+        });
+    </script>
 </body>
 </html>

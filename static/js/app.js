@@ -111,6 +111,23 @@ class MyAIGist {
                 this.updateFileDisplay();
             });
         }
+
+        // Summary action buttons
+        const copySummaryBtn = document.getElementById('copy-summary-btn');
+        if (copySummaryBtn) {
+            copySummaryBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.copySummaryToClipboard();
+            });
+        }
+
+        const emailSummaryBtn = document.getElementById('email-summary-btn');
+        if (emailSummaryBtn) {
+            emailSummaryBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.emailSummary();
+            });
+        }
     }
 
     setupTabs() {
@@ -606,6 +623,12 @@ class MyAIGist {
         const levelNames = { quick: 'Quick', standard: 'Standard', detailed: 'Detailed' };
         if (levelBadge) levelBadge.textContent = levelNames[level] || 'Standard';
 
+        // Show action buttons when summary is available
+        const summaryActions = document.getElementById('summary-actions');
+        if (summaryActions && summary && summary.trim()) {
+            summaryActions.classList.remove('hidden');
+        }
+
         if (summarySection) summarySection.classList.remove('hidden');
     }
 
@@ -1081,6 +1104,68 @@ class MyAIGist {
         const qaSection = document.getElementById('qa-section');
         if (qaSection) {
             qaSection.classList.remove('hidden');
+        }
+    }
+
+    // Copy summary to clipboard
+    async copySummaryToClipboard() {
+        const summaryText = document.getElementById('summary-text');
+        if (!summaryText || !summaryText.textContent) {
+            this.showStatus('No summary available to copy', 'error');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(summaryText.textContent);
+            this.showStatus('✅ Summary copied to clipboard!', 'success');
+            
+            // Track event for analytics
+            this.trackEvent('summary_copied', {
+                content_length: summaryText.textContent.length,
+                summary_level: this.selectedSummaryLevel
+            });
+            
+            // Visual feedback on button
+            const copyBtn = document.getElementById('copy-summary-btn');
+            if (copyBtn) {
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '✅ Copied!';
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                }, 2000);
+            }
+        } catch (err) {
+            console.error('Failed to copy to clipboard:', err);
+            this.showStatus('❌ Failed to copy to clipboard', 'error');
+        }
+    }
+
+    // Email summary
+    emailSummary() {
+        const summaryText = document.getElementById('summary-text');
+        if (!summaryText || !summaryText.textContent) {
+            this.showStatus('No summary available to email', 'error');
+            return;
+        }
+
+        try {
+            const subject = 'MyAIGist Summary: ';
+            const body = summaryText.textContent;
+            const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            
+            // Open default email client
+            window.location.href = mailtoLink;
+            
+            // Track event for analytics
+            this.trackEvent('summary_emailed', {
+                content_length: body.length,
+                summary_level: this.selectedSummaryLevel
+            });
+            
+            this.showStatus('✅ Opening email client...', 'success');
+        } catch (err) {
+            console.error('Failed to open email client:', err);
+            this.showStatus('❌ Failed to open email client', 'error');
         }
     }
 }
