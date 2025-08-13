@@ -455,6 +455,11 @@ htmlcov/
 # GitHub Actions
 .github/workflows/secrets.yml
 
+# CI/CD temporary files created by deployment scripts
+current-task-def.json
+prod-task-definition-*.json
+qa-task-definition-*.json
+
 # ========================================
 # DOCUMENTATION
 # ========================================
