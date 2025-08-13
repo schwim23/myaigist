@@ -921,8 +921,18 @@ class MyAIGist {
                 this.showStatus(`Successfully analyzed ${data.successful_uploads} document${data.successful_uploads > 1 ? 's' : ''}!`, 'success');
                 
                 // Phase 2: Generate audio in background (if there's text to convert)
-                if (summaryText && summaryText !== 'Multiple files processed successfully') {
-                    this.generateAudioInBackground(summaryText, data.voice || this.selectedVoice);
+                console.log('🎵 Checking audio generation conditions:');
+                console.log('  - summaryText:', summaryText ? `"${summaryText.substring(0, 100)}..."` : 'null/undefined');
+                console.log('  - summaryText length:', summaryText ? summaryText.length : 0);
+                console.log('  - voice:', data.voice || this.selectedVoice);
+                
+                if (summaryText && summaryText.trim() !== '' && summaryText !== 'Multiple files processed successfully') {
+                    console.log('✅ Conditions met, calling generateAudioInBackground');
+                    setTimeout(() => {
+                        this.generateAudioInBackground(summaryText, data.voice || this.selectedVoice);
+                    }, 1000); // Add small delay to ensure UI is ready
+                } else {
+                    console.log('❌ Audio generation skipped - conditions not met');
                 }
                 
                 return true; // Return true to indicate success
