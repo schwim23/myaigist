@@ -8,7 +8,7 @@ class MyAIGist {
         this.currentRecordingBlob = null;
         this.selectedSummaryLevel = 'standard'; // Default to standard
         this.selectedVoice = 'nova'; // Default voice
-        this.selectedFiles = []; // For multi-file upload
+        this.selectedInputs = []; // Unified input system (text and files)
         this.userDocuments = []; // Track user's uploaded documents
 
         // Bind methods (extra safety against "not a function" if something rebinds context)
@@ -100,15 +100,20 @@ class MyAIGist {
             });
         }
 
-        // ✅ Unified file input handling (single or multiple files)
+        // ✅ Unified input system handling
+        const addTextBtn = document.getElementById('add-text-btn');
+        if (addTextBtn) {
+            addTextBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showTextInputModal();
+            });
+        }
+
         const fileInput = document.getElementById('file-input');
-        const fileNameEl = document.getElementById('file-name');
-        const selectedFilesDiv = document.getElementById('selected-files');
-        
         if (fileInput) {
             fileInput.addEventListener('change', (e) => {
-                this.selectedFiles = Array.from(e.target.files);
-                this.updateFileDisplay();
+                this.handleFileSelection(Array.from(e.target.files));
+                e.target.value = ''; // Reset input for re-selection
             });
         }
 
@@ -405,9 +410,11 @@ class MyAIGist {
 
     // ===== Content processing =====
     async processContent() {
-        // Defensive: find active tab, default to 'text'
-        const activeBtn = document.querySelector('.tab-btn.active');
-        const activeTab = activeBtn?.dataset?.tab || 'text';
+        // Check if we have inputs
+        if (!this.selectedInputs?.length) {
+            this.showStatus('❌ Please add some content to analyze', 'error');
+            return;
+        }
 
         const processBtn = document.getElementById('process-btn');
         if (processBtn) {
@@ -416,126 +423,25 @@ class MyAIGist {
         }
 
         try {
-            let requestData;
-            let formData;
-            let isFormData = false;
+            // Separate text and file inputs
+            const textInputs = this.selectedInputs.filter(input => input.type === 'text');
+            const fileInputs = this.selectedInputs.filter(input => input.type === 'file');
 
-            if (activeTab === 'text') {
-                const text = document.getElementById('text-input')?.value?.trim() || '';
-                if (!text) throw new Error('Please enter some text to analyze');
-                requestData = { type: 'text', text, summary_level: this.selectedSummaryLevel, voice: this.selectedVoice };
-
-            } else if (activeTab === 'file') {
-                if (!this.selectedFiles?.length) throw new Error('Please select a file to upload');
-
-                if (this.selectedFiles.length === 1) {
-                    // Single file - use existing endpoint
-                    formData = new FormData();
-                    formData.append('file', this.selectedFiles[0]);
-                    formData.append('type', 'file');
-                    formData.append('summary_level', this.selectedSummaryLevel);
-                    formData.append('voice', this.selectedVoice);
-                    isFormData = true;
-                } else {
-                    // Multiple files - use multi-file upload
-                    return this.uploadMultipleFiles();
-                }
+            // If we have multiple inputs or any files, use multi-input processing
+            if (this.selectedInputs.length > 1 || fileInputs.length > 0) {
+                return this.processMultipleInputs();
             }
 
-            const levelNames = { quick: 'Quick', standard: 'Standard', detailed: 'Detailed' };
-            this.showStatus(`Processing your content with ${levelNames[this.selectedSummaryLevel]} summary...`, 'loading');
-
-            const response = await fetch('/api/process-content', {
-                method: 'POST',
-                ...(!isFormData && {
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify(requestData)
-                }),
-                ...(isFormData && { body: formData })
-            });
-
-            console.log('📡 Process content response status:', response.status);
-
-            if (!response.ok) {
-                const raw = await response.text();
-                let msg = `Processing failed (${response.status})`;
-                try {
-                    const err = JSON.parse(raw);
-                    msg = err.error || msg;
-                } catch (_) {
-                    msg = `${msg}: ${raw}`;
-                }
-                throw new Error(msg);
-            }
-
-            const result = await response.json();
-
-            if (result.success) {
-                // Phase 1: Show summary immediately for responsive feel
-                this.showSummary(result.summary, null, this.selectedSummaryLevel); // No audio initially
-                
-                // Get active tab for tracking and text clearing
-                const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-                
-                // Track summarization event
-                this.trackEvent('content_summarized', {
-                    content_type: activeTab,
+            // Single text input - use simple text processing
+            if (textInputs.length === 1) {
+                const requestData = {
+                    type: 'text', 
+                    text: textInputs[0].content,
                     summary_level: this.selectedSummaryLevel,
-                    has_audio: !!result.audio_url
-                });
-                this.showQASection();
-                this.showStatus(`Content processed successfully with ${levelNames[this.selectedSummaryLevel]} summary! You can now ask questions.`, 'success');
-                console.log('✅ Content processed successfully, QA stored:', result.qa_stored);
+                    voice: this.selectedVoice
+                };
                 
-                // Phase 2: Generate audio in background if we have summary text
-                if (result.summary && result.summary.trim().length > 10) {
-                    setTimeout(async () => {
-                        try {
-                            // Show audio loading indicator
-                            const audioLoading = document.getElementById('audio-loading');
-                            if (audioLoading) {
-                                audioLoading.classList.remove('hidden');
-                            }
-                            
-                            await this.generateAudioInBackground(result.summary, this.selectedVoice);
-                        } catch (audioError) {
-                            console.error('❌ Audio generation failed with error:', audioError);
-                            // Hide loading indicator on error
-                            const audioLoading = document.getElementById('audio-loading');
-                            if (audioLoading) {
-                                audioLoading.classList.add('hidden');
-                                audioLoading.style.display = 'none';
-                                console.log('❌ Audio loading indicator hidden due to error');
-                            }
-                        }
-                    }, 1000); // Add delay to ensure UI is ready
-                }
-
-                // Clear inputs for next entry
-                if (activeTab === 'text') {
-                    const textInput = document.getElementById('text-input');
-                    if (textInput) {
-                        textInput.value = '';
-                        textInput.placeholder = 'Enter your next text here for AI analysis...';
-                    }
-                } else if (activeTab === 'file') {
-                    // Clear file selection
-                    this.selectedFiles = [];
-                    this.updateFileDisplay();
-                    const fileInput = document.getElementById('file-input');
-                    if (fileInput) fileInput.value = '';
-                }
-
-                // Refresh file shelf if document was stored for QA
-                if (result.qa_stored) {
-                    setTimeout(() => this.loadUserDocuments(), 1000);
-                }
-
-                // Give backend a moment if needed
-                setTimeout(() => console.log('✅ Post-processing wait complete'), 1500);
-
-            } else {
-                throw new Error(result.error || 'Processing failed');
+                return this.processSingleContent(requestData, false);
             }
 
         } catch (error) {
@@ -547,6 +453,160 @@ class MyAIGist {
                 processBtn.innerHTML = '🚀 Analyze Content';
             }
         }
+    }
+
+    async processSingleContent(requestData, isFormData) {
+        const levelNames = { quick: 'Quick', standard: 'Standard', detailed: 'Detailed' };
+        this.showStatus(`Processing your content with ${levelNames[this.selectedSummaryLevel]} summary...`, 'loading');
+
+        const response = await fetch('/api/process-content', {
+            method: 'POST',
+            ...(!isFormData && {
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(requestData)
+            }),
+            ...(isFormData && { body: requestData })
+        });
+
+        if (!response.ok) {
+            const raw = await response.text();
+            let msg = `Processing failed (${response.status})`;
+            try {
+                const err = JSON.parse(raw);
+                msg = err.error || msg;
+            } catch (_) {
+                msg = `${msg}: ${raw}`;
+            }
+            throw new Error(msg);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Phase 1: Show summary immediately
+            this.showSummary(result.summary, null, this.selectedSummaryLevel);
+            this.showQASection();
+            this.showStatus(`Content processed successfully! You can now ask questions.`, 'success');
+            
+            // Phase 2: Generate audio in background
+            if (result.summary && result.summary.trim().length > 10) {
+                setTimeout(async () => {
+                    try {
+                        const audioLoading = document.getElementById('audio-loading');
+                        if (audioLoading) audioLoading.classList.remove('hidden');
+                        await this.generateAudioInBackground(result.summary, this.selectedVoice);
+                    } catch (audioError) {
+                        console.error('❌ Audio generation failed:', audioError);
+                        const audioLoading = document.getElementById('audio-loading');
+                        if (audioLoading) {
+                            audioLoading.classList.add('hidden');
+                            audioLoading.style.display = 'none';
+                        }
+                    }
+                }, 1000);
+            }
+
+            // Clear inputs and refresh
+            this.clearAllInputs();
+            if (result.qa_stored) {
+                setTimeout(() => this.loadUserDocuments(), 1000);
+            }
+        } else {
+            throw new Error(result.error || 'Processing failed');
+        }
+    }
+
+    async processMultipleInputs() {
+        // Use the existing multi-file upload logic but adapted for mixed inputs
+        console.log('📁 Processing multiple inputs...');
+        
+        const formData = new FormData();
+        const textInputs = this.selectedInputs.filter(input => input.type === 'text');
+        const fileInputs = this.selectedInputs.filter(input => input.type === 'file');
+        
+        // Add files
+        fileInputs.forEach((input, index) => {
+            formData.append('files', input.file);
+        });
+        
+        // Add text entries as "virtual files"
+        textInputs.forEach((input, index) => {
+            const textBlob = new Blob([input.content], { type: 'text/plain' });
+            const textFile = new File([textBlob], `${input.title}.txt`, { type: 'text/plain' });
+            formData.append('files', textFile);
+        });
+        
+        formData.append('summary_level', this.selectedSummaryLevel);
+        formData.append('voice', this.selectedVoice);
+        
+        const levelNames = { quick: 'Quick', standard: 'Standard', detailed: 'Detailed' };
+        this.showStatus(`Processing ${this.selectedInputs.length} input(s) with ${levelNames[this.selectedSummaryLevel]} summary...`, 'loading');
+
+        const response = await fetch('/api/multi-upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const raw = await response.text();
+            let msg = `Multi-input processing failed (${response.status})`;
+            try {
+                const err = JSON.parse(raw);
+                msg = err.error || msg;
+            } catch (_) {
+                msg = `${msg}: ${raw}`;
+            }
+            throw new Error(msg);
+        }
+
+        const data = await response.json();
+        console.log('✅ Multi-input response:', data);
+
+        if (data.success) {
+            // Phase 1: Show summary immediately
+            const summaryText = data.combined_summary || 'Content processed successfully';
+            this.showSummary(summaryText, null, this.selectedSummaryLevel);
+            this.showQASection();
+            await this.loadUserDocuments();
+
+            // Track event
+            this.trackEvent('multi_input_processed', {
+                total_inputs: this.selectedInputs.length,
+                text_inputs: textInputs.length,
+                file_inputs: fileInputs.length,
+                summary_level: this.selectedSummaryLevel
+            });
+            
+            this.showStatus(`Successfully analyzed ${this.selectedInputs.length} input(s)!`, 'success');
+            
+            // Phase 2: Generate audio in background
+            if (summaryText && summaryText.trim().length > 10) {
+                setTimeout(async () => {
+                    try {
+                        const audioLoading = document.getElementById('audio-loading');
+                        if (audioLoading) audioLoading.classList.remove('hidden');
+                        await this.generateAudioInBackground(summaryText, data.voice || this.selectedVoice);
+                    } catch (audioError) {
+                        console.error('❌ Audio generation failed:', audioError);
+                        const audioLoading = document.getElementById('audio-loading');
+                        if (audioLoading) {
+                            audioLoading.classList.add('hidden');
+                            audioLoading.style.display = 'none';
+                        }
+                    }
+                }, 1000);
+            }
+            
+            // Clear inputs
+            this.clearAllInputs();
+        } else {
+            throw new Error(data.error || 'Multi-input processing failed');
+        }
+    }
+
+    clearAllInputs() {
+        this.selectedInputs = [];
+        this.updateInputDisplay();
     }
 
     async askQuestion() {
@@ -801,55 +861,7 @@ class MyAIGist {
         console.log('✅ File upload system initialized (unified single/multi)');
     }
 
-    updateFileDisplay() {
-        const selectedFilesDiv = document.getElementById('selected-files');
-        const selectedFilesList = document.getElementById('selected-files-list');
-        const fileNameEl = document.getElementById('file-name');
-
-        if (this.selectedFiles.length === 0) {
-            if (selectedFilesDiv) selectedFilesDiv.style.display = 'none';
-            if (fileNameEl) {
-                fileNameEl.style.display = 'block';
-                fileNameEl.textContent = 'No files selected';
-            }
-            return;
-        }
-
-        if (this.selectedFiles.length === 1) {
-            // Single file - show simple display
-            if (selectedFilesDiv) selectedFilesDiv.style.display = 'none';
-            if (fileNameEl) {
-                fileNameEl.style.display = 'block';
-                fileNameEl.textContent = `Selected: ${this.selectedFiles[0].name}`;
-            }
-        } else {
-            // Multiple files - show detailed list
-            if (fileNameEl) fileNameEl.style.display = 'none';
-            if (selectedFilesDiv && selectedFilesList) {
-                selectedFilesDiv.style.display = 'block';
-                
-                selectedFilesList.innerHTML = this.selectedFiles.map((file, index) => `
-                    <div class="selected-file-item">
-                        <span class="selected-file-name">${file.name}</span>
-                        <button class="remove-file" onclick="myAIGist.removeSelectedFile(${index})" title="Remove file">
-                            ×
-                        </button>
-                    </div>
-                `).join('');
-            }
-        }
-    }
-
-    removeSelectedFile(index) {
-        this.selectedFiles.splice(index, 1);
-        this.updateFileDisplay();
-        
-        // Update the file input
-        const fileInput = document.getElementById('file-input');
-        if (fileInput && this.selectedFiles.length === 0) {
-            fileInput.value = '';
-        }
-    }
+    // Old methods removed - using unified input system
 
     async uploadMultipleFiles() {
         try {
@@ -1231,6 +1243,209 @@ class MyAIGist {
             console.error('Failed to open email client:', err);
             this.showStatus('❌ Failed to open email client', 'error');
         }
+    }
+
+    // Unified Input System Methods
+    showTextInputModal() {
+        if (this.selectedInputs.length >= 5) {
+            this.showStatus('❌ Maximum 5 inputs allowed', 'error');
+            return;
+        }
+
+        // Create modal HTML
+        const modal = document.createElement('div');
+        modal.className = 'text-input-modal';
+        modal.innerHTML = `
+            <div class="text-input-modal-content">
+                <h3>✍️ Add Text Entry</h3>
+                <textarea 
+                    id="modal-text-input" 
+                    placeholder="Enter your text here for AI analysis..."
+                    maxlength="10000"
+                ></textarea>
+                <div class="text-input-modal-actions">
+                    <button class="text-input-modal-btn cancel">Cancel</button>
+                    <button class="text-input-modal-btn add">Add Text</button>
+                </div>
+            </div>
+        `;
+
+        // Add to body
+        document.body.appendChild(modal);
+
+        // Focus textarea
+        const textarea = modal.querySelector('#modal-text-input');
+        setTimeout(() => textarea.focus(), 100);
+
+        // Handle buttons
+        const cancelBtn = modal.querySelector('.cancel');
+        const addBtn = modal.querySelector('.add');
+
+        cancelBtn.addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+
+        addBtn.addEventListener('click', () => {
+            const text = textarea.value.trim();
+            if (!text) {
+                this.showStatus('❌ Please enter some text', 'error');
+                return;
+            }
+            if (text.length < 10) {
+                this.showStatus('❌ Text must be at least 10 characters', 'error');
+                return;
+            }
+
+            this.addTextInput(text);
+            document.body.removeChild(modal);
+        });
+
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+    }
+
+    addTextInput(text) {
+        const textInput = {
+            id: `text_${Date.now()}`,
+            type: 'text',
+            content: text,
+            title: `Text Entry ${this.selectedInputs.filter(i => i.type === 'text').length + 1}`,
+            preview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+            size: text.length
+        };
+
+        this.selectedInputs.push(textInput);
+        this.updateInputDisplay();
+        this.showStatus('✅ Text entry added!', 'success');
+    }
+
+    handleFileSelection(files) {
+        if (files.length === 0) return;
+
+        const remainingSlots = 5 - this.selectedInputs.length;
+        if (files.length > remainingSlots) {
+            this.showStatus(`❌ Can only add ${remainingSlots} more item(s). Maximum 5 inputs allowed.`, 'error');
+            return;
+        }
+
+        files.forEach(file => {
+            const fileInput = {
+                id: `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                type: 'file',
+                file: file,
+                title: file.name,
+                preview: `${file.type || 'Unknown type'} • ${this.formatFileSize(file.size)}`,
+                size: file.size
+            };
+
+            this.selectedInputs.push(fileInput);
+        });
+
+        this.updateInputDisplay();
+        this.showStatus(`✅ Added ${files.length} file(s)!`, 'success');
+    }
+
+    removeInput(inputId) {
+        this.selectedInputs = this.selectedInputs.filter(input => input.id !== inputId);
+        this.updateInputDisplay();
+        this.showStatus('✅ Input removed', 'success');
+    }
+
+    updateInputDisplay() {
+        const inputsList = document.getElementById('selected-inputs-list');
+        const inputsContainer = document.getElementById('selected-inputs');
+        const addTextBtn = document.getElementById('add-text-btn');
+        const fileInputLabel = document.querySelector('.file-input-label');
+
+        if (!inputsList) return;
+
+        // Update button states
+        const isMaxReached = this.selectedInputs.length >= 5;
+        if (addTextBtn) {
+            addTextBtn.disabled = isMaxReached;
+            addTextBtn.title = isMaxReached ? 'Maximum 5 inputs reached' : 'Add text entry';
+        }
+        if (fileInputLabel) {
+            if (isMaxReached) {
+                fileInputLabel.style.opacity = '0.5';
+                fileInputLabel.style.cursor = 'not-allowed';
+                fileInputLabel.title = 'Maximum 5 inputs reached';
+            } else {
+                fileInputLabel.style.opacity = '1';
+                fileInputLabel.style.cursor = 'pointer';
+                fileInputLabel.title = 'Add document(s)';
+            }
+        }
+
+        // Show/hide container and warning
+        if (this.selectedInputs.length === 0) {
+            inputsContainer.style.display = 'none';
+            this.removeWarning();
+        } else {
+            inputsContainer.style.display = 'block';
+            
+            inputsList.innerHTML = this.selectedInputs.map(input => `
+                <div class="input-item" data-id="${input.id}">
+                    <div class="input-item-icon">
+                        ${input.type === 'text' ? '📝' : '📄'}
+                    </div>
+                    <div class="input-item-content">
+                        <div class="input-item-header">
+                            <h4 class="input-item-title">${this.escapeHtml(input.title)}</h4>
+                            <span class="input-item-type">${input.type.toUpperCase()}</span>
+                        </div>
+                        <p class="input-item-preview">${this.escapeHtml(input.preview)}</p>
+                        ${input.type === 'text' ? 
+                            `<div class="input-item-meta">${input.size} characters</div>` :
+                            `<div class="input-item-meta">${this.formatFileSize(input.size)}</div>`
+                        }
+                    </div>
+                    <button class="input-item-remove" onclick="app.removeInput('${input.id}')" title="Remove">×</button>
+                </div>
+            `).join('');
+
+            // Show warning when approaching limit
+            if (this.selectedInputs.length >= 4) {
+                this.showWarning();
+            } else {
+                this.removeWarning();
+            }
+        }
+    }
+
+    showWarning() {
+        const existingWarning = document.querySelector('.input-limit-warning');
+        if (existingWarning) return;
+
+        const inputsContainer = document.getElementById('selected-inputs');
+        const warning = document.createElement('div');
+        warning.className = 'input-limit-warning';
+        warning.textContent = `${5 - this.selectedInputs.length} input slot(s) remaining`;
+        
+        inputsContainer.appendChild(warning);
+    }
+
+    removeWarning() {
+        const warning = document.querySelector('.input-limit-warning');
+        if (warning) warning.remove();
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 

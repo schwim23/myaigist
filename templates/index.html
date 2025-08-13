@@ -405,6 +405,258 @@
             100% { transform: rotate(360deg); }
         }
         
+        /* Unified Input System Styling */
+        .unified-input-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        
+        .input-title {
+            color: white;
+            font-size: 1.4rem;
+            margin: 0 0 8px 0;
+            font-weight: 600;
+        }
+        
+        .input-limit {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            margin: 0;
+            font-style: italic;
+        }
+        
+        .input-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        
+        .action-input-btn {
+            padding: 12px 24px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .action-input-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .action-input-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .selected-inputs {
+            margin-bottom: 25px;
+        }
+        
+        .selected-inputs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .input-item {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s ease;
+        }
+        
+        .input-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .input-item-icon {
+            font-size: 1.2rem;
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        
+        .input-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .input-item-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+        
+        .input-item-title {
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .input-item-type {
+            background: rgba(103, 126, 234, 0.3);
+            color: #a5b4fc;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .input-item-preview {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.8rem;
+            line-height: 1.4;
+            margin: 0;
+            word-break: break-word;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .input-item-meta {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.75rem;
+            margin: 5px 0 0 0;
+        }
+        
+        .input-item-remove {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        
+        .input-item-remove:hover {
+            background: rgba(239, 68, 68, 0.4);
+            border-color: rgba(239, 68, 68, 0.5);
+            transform: scale(1.1);
+        }
+        
+        .input-limit-warning {
+            color: #fbbf24;
+            font-size: 0.85rem;
+            text-align: center;
+            margin: 10px 0;
+            padding: 8px 15px;
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .text-input-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+        
+        .text-input-modal-content {
+            background: linear-gradient(135deg, rgba(103, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+            border-radius: 16px;
+            padding: 25px;
+            width: 90%;
+            max-width: 500px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .text-input-modal h3 {
+            color: white;
+            margin: 0 0 15px 0;
+            font-size: 1.2rem;
+        }
+        
+        .text-input-modal textarea {
+            width: 100%;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            color: white;
+            padding: 12px;
+            font-size: 0.9rem;
+            resize: vertical;
+            backdrop-filter: blur(10px);
+        }
+        
+        .text-input-modal textarea::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .text-input-modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 15px;
+        }
+        
+        .text-input-modal-btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .text-input-modal-btn.cancel {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .text-input-modal-btn.add {
+            background: rgba(34, 197, 94, 0.8);
+            color: white;
+        }
+        
+        .text-input-modal-btn:hover {
+            transform: translateY(-1px);
+        }
+        
         /* Summary action buttons styling */
         .summary-actions {
             display: flex;
@@ -506,44 +758,27 @@
 
         <!-- Content Input Section -->
         <section class="input-section">
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="text">📝 Text</button>
-                <button class="tab-btn" data-tab="file">📄 Document</button>
+            <div class="unified-input-header">
+                <h3 class="input-title">📋 Add Content for Analysis</h3>
+                <p class="input-limit">Add up to 5 items (text entries or documents) for AI analysis</p>
             </div>
 
-            <div class="tab-content">
-                <!-- Text Input -->
-                <div id="text-tab" class="tab-panel active">
-                    <textarea 
-                        id="text-input" 
-                        placeholder="Enter your text here for AI analysis..."
-                        rows="8"
-                    ></textarea>
+            <!-- Input Actions -->
+            <div class="input-actions">
+                <button id="add-text-btn" class="action-input-btn">
+                    ✍️ Add Text Entry
+                </button>
+                <div class="file-input-container">
+                    <input type="file" id="file-input" class="file-input" multiple accept=".pdf,.docx,.txt" />
+                    <label for="file-input" class="file-input-label action-input-btn">
+                        📄 Add Document(s)
+                    </label>
                 </div>
+            </div>
 
-                <!-- File Upload -->
-                <div id="file-tab" class="tab-panel">
-                    <div class="unified-upload-section">
-                        <div class="upload-header">
-                            <h3 class="upload-title">📁 Document Upload</h3>
-                            <p class="upload-desc">Select one or more documents (up to 5 files) - PDF, DOCX, or TXT</p>
-                        </div>
-                        
-                        <div class="file-input-container">
-                            <input type="file" id="file-input" class="file-input" multiple accept=".pdf,.docx,.txt" />
-                            <label for="file-input" class="file-input-label">
-                                📄 Choose Document(s)
-                            </label>
-                        </div>
-                        
-                        <div id="selected-files" class="selected-files" style="display: none;">
-                            <h4 class="selected-files-header">Selected Files:</h4>
-                            <div id="selected-files-list"></div>
-                        </div>
-                        
-                        <div id="file-name" class="file-name" style="display: none;">No files selected</div>
-                    </div>
-                </div>
+            <!-- Selected Inputs Display -->
+            <div id="selected-inputs" class="selected-inputs">
+                <div id="selected-inputs-list"></div>
             </div>
 
             <!-- Summary Options -->
