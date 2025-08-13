@@ -926,13 +926,21 @@ class MyAIGist {
                 console.log('  - summaryText length:', summaryText ? summaryText.length : 0);
                 console.log('  - voice:', data.voice || this.selectedVoice);
                 
-                if (summaryText && summaryText.trim() !== '' && summaryText !== 'Multiple files processed successfully') {
+                // Always try to generate audio if we have valid summary text
+                if (summaryText && summaryText.trim().length > 10) { // Changed condition - just check for meaningful text
                     console.log('✅ Conditions met, calling generateAudioInBackground');
-                    setTimeout(() => {
-                        this.generateAudioInBackground(summaryText, data.voice || this.selectedVoice);
+                    setTimeout(async () => {
+                        try {
+                            await this.generateAudioInBackground(summaryText, data.voice || this.selectedVoice);
+                        } catch (audioError) {
+                            console.error('❌ Audio generation failed with error:', audioError);
+                        }
                     }, 1000); // Add small delay to ensure UI is ready
                 } else {
-                    console.log('❌ Audio generation skipped - conditions not met');
+                    console.log('❌ Audio generation skipped - no meaningful text');
+                    console.log('  - summaryText value:', JSON.stringify(summaryText));
+                    console.log('  - summaryText type:', typeof summaryText);
+                    console.log('  - summaryText length:', summaryText ? summaryText.length : 0);
                 }
                 
                 return true; // Return true to indicate success
