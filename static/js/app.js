@@ -471,7 +471,8 @@ class MyAIGist {
             const result = await response.json();
 
             if (result.success) {
-                this.showSummary(result.summary, result.audio_url, this.selectedSummaryLevel);
+                // Phase 1: Show summary immediately for responsive feel
+                this.showSummary(result.summary, null, this.selectedSummaryLevel); // No audio initially
                 
                 // Get active tab for tracking and text clearing
                 const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
@@ -485,6 +486,30 @@ class MyAIGist {
                 this.showQASection();
                 this.showStatus(`Content processed successfully with ${levelNames[this.selectedSummaryLevel]} summary! You can now ask questions.`, 'success');
                 console.log('✅ Content processed successfully, QA stored:', result.qa_stored);
+                
+                // Phase 2: Generate audio in background if we have summary text
+                if (result.summary && result.summary.trim().length > 10) {
+                    setTimeout(async () => {
+                        try {
+                            // Show audio loading indicator
+                            const audioLoading = document.getElementById('audio-loading');
+                            if (audioLoading) {
+                                audioLoading.classList.remove('hidden');
+                            }
+                            
+                            await this.generateAudioInBackground(result.summary, this.selectedVoice);
+                        } catch (audioError) {
+                            console.error('❌ Audio generation failed with error:', audioError);
+                            // Hide loading indicator on error
+                            const audioLoading = document.getElementById('audio-loading');
+                            if (audioLoading) {
+                                audioLoading.classList.add('hidden');
+                                audioLoading.style.display = 'none';
+                                console.log('❌ Audio loading indicator hidden due to error');
+                            }
+                        }
+                    }, 1000); // Add delay to ensure UI is ready
+                }
 
                 // Clear inputs for next entry
                 if (activeTab === 'text') {
