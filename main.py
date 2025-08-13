@@ -816,18 +816,21 @@ def upload_multiple_files():
         
         print(f"✅ Successfully extracted text from {len(valid_files)} files")
         
-        # Phase 2: Batch generate summaries
-        print("📋 Phase 2: Batch generating summaries...")
-        texts_for_summary = [f['text'] for f in valid_files]
-        
-        # Generate summaries (could be optimized to batch if summarizer supports it)
-        for i, file_entry in enumerate(valid_files):
+        # Phase 2: Generate individual summaries only for single files or as fallback
+        if len(valid_files) == 1:
+            print("📋 Phase 2: Generating summary for single file...")
+            file_entry = valid_files[0]
             try:
                 summary = summarizer.summarize(file_entry['text'], detail_level=summary_level)
                 file_entry['summary'] = summary
             except Exception as e:
                 print(f"⚠️ Summary generation failed for {file_entry['filename']}: {e}")
                 file_entry['summary'] = f"Summary generation failed: {str(e)}"
+        else:
+            print(f"📋 Phase 2: Skipping individual summaries for multi-file upload (will generate unified summary)")
+            # For multi-file, we'll generate individual summaries only if unified summary fails
+            for file_entry in valid_files:
+                file_entry['summary'] = None  # Will be generated later if needed
         
         # Phase 3: Optimized batch document storage
         print("🔄 Phase 3: Batch storing documents for Q&A...")
@@ -933,13 +936,54 @@ def upload_multiple_files():
                     'error': file_entry.get('error', 'Unknown error')
                 })
         
-        # Generate combined summary if multiple files uploaded successfully
+        # Generate unified summary from all source texts (not individual summaries)
         combined_summary = None
         if successful_uploads > 1:
-            summaries = [r['summary'] for r in results if r['success'] and 'summary' in r]
-            if summaries:
-                combined_text = "\n\n---\n\n".join(summaries)
-                combined_summary = f"Successfully analyzed {successful_uploads} files with summaries:\n\n" + combined_text
+            # Collect all source texts for unified summarization
+            source_texts = []
+            successful_files = []
+            
+            for file_entry in valid_files:
+                if file_entry.get('qa_stored', False):
+                    source_texts.append(file_entry['text'])
+                    successful_files.append(file_entry['filename'])
+            
+            if source_texts:
+                # Create a unified document from all sources
+                unified_text = f"Combined analysis of {len(successful_files)} documents ({', '.join(successful_files)}):\n\n"
+                
+                # Add each document with a clear separator and title
+                for i, (filename, text) in enumerate(zip(successful_files, source_texts), 1):
+                    unified_text += f"=== Document {i}: {filename} ===\n\n{text}\n\n"
+                
+                print(f"🔄 Generating unified summary from {len(source_texts)} source documents")
+                try:
+                    # Generate a single unified summary from all combined texts
+                    combined_summary = summarizer.summarize(unified_text, detail_level=summary_level)
+                except Exception as e:
+                    print(f"⚠️ Unified summary generation failed: {e}")
+                    print(f"🔄 Fallback: Generating individual summaries...")
+                    
+                    # Generate individual summaries as fallback
+                    individual_summaries = []
+                    for file_entry in valid_files:
+                        if file_entry.get('qa_stored', False):
+                            try:
+                                summary = summarizer.summarize(file_entry['text'], detail_level=summary_level)
+                                individual_summaries.append(f"**{file_entry['filename']}**: {summary}")
+                            except Exception as summary_error:
+                                print(f"⚠️ Individual summary failed for {file_entry['filename']}: {summary_error}")
+                                individual_summaries.append(f"**{file_entry['filename']}**: Summary generation failed")
+                    
+                    if individual_summaries:
+                        combined_text = "\n\n".join(individual_summaries)
+                        combined_summary = f"Analysis of {successful_uploads} documents:\n\n" + combined_text
+        elif successful_uploads == 1:
+            # Single file - use its individual summary
+            for result in results:
+                if result['success'] and 'summary' in result:
+                    combined_summary = result['summary']
+                    break
         
         # Return response immediately with summary, audio will be generated separately
         return jsonify({
