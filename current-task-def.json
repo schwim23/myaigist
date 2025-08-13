@@ -1,0 +1,136 @@
+{
+    "taskDefinitionArn": "arn:aws:ecs:us-east-1:039357025951:task-definition/myaigist-task:5",
+    "containerDefinitions": [
+        {
+            "name": "myaigist",
+            "image": "039357025951.dkr.ecr.us-east-1.amazonaws.com/myaigist:latest",
+            "cpu": 0,
+            "portMappings": [
+                {
+                    "containerPort": 8000,
+                    "hostPort": 8000,
+                    "protocol": "tcp"
+                }
+            ],
+            "essential": true,
+            "environment": [
+                {
+                    "name": "OPENAI_EMBED_MODEL",
+                    "value": "text-embedding-3-small"
+                },
+                {
+                    "name": "FLASK_ENV",
+                    "value": "production"
+                },
+                {
+                    "name": "OPENAI_TTS_MODEL",
+                    "value": "tts-1"
+                },
+                {
+                    "name": "OPENAI_WHISPER_MODEL",
+                    "value": "whisper-1"
+                }
+            ],
+            "mountPoints": [
+                {
+                    "sourceVolume": "efs-volume",
+                    "containerPath": "/app/data"
+                },
+                {
+                    "sourceVolume": "efs-volume",
+                    "containerPath": "/app/static/audio"
+                }
+            ],
+            "volumesFrom": [],
+            "secrets": [
+                {
+                    "name": "OPENAI_API_KEY",
+                    "valueFrom": "arn:aws:ssm:us-east-1:039357025951:parameter/myaigist/openai-api-key"
+                },
+                {
+                    "name": "OPENAI_MODEL",
+                    "valueFrom": "arn:aws:ssm:us-east-1:039357025951:parameter/myaigist/openai-model"
+                },
+                {
+                    "name": "GA_MEASUREMENT_ID",
+                    "valueFrom": "arn:aws:ssm:us-east-1:039357025951:parameter/myaigist/ga-measurement-id"
+                }
+            ],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/myaigist",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                }
+            },
+            "systemControls": []
+        }
+    ],
+    "family": "myaigist-task",
+    "taskRoleArn": "arn:aws:iam::039357025951:role/ecsTaskRole",
+    "executionRoleArn": "arn:aws:iam::039357025951:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "revision": 5,
+    "volumes": [
+        {
+            "name": "efs-volume",
+            "efsVolumeConfiguration": {
+                "fileSystemId": "fs-0cd336ba0439e9836",
+                "rootDirectory": "/",
+                "transitEncryption": "ENABLED"
+            }
+        }
+    ],
+    "status": "ACTIVE",
+    "requiresAttributes": [
+        {
+            "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+        },
+        {
+            "name": "ecs.capability.execution-role-awslogs"
+        },
+        {
+            "name": "ecs.capability.efsAuth"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.ecr-auth"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+        },
+        {
+            "name": "ecs.capability.efs"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.task-iam-role"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.25"
+        },
+        {
+            "name": "ecs.capability.execution-role-ecr-pull"
+        },
+        {
+            "name": "ecs.capability.secrets.ssm.environment-variables"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+        },
+        {
+            "name": "ecs.capability.task-eni"
+        }
+    ],
+    "placementConstraints": [],
+    "compatibilities": [
+        "EC2",
+        "FARGATE"
+    ],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "1024",
+    "memory": "2048",
+    "registeredAt": "2025-08-11T14:37:27.543000-04:00",
+    "registeredBy": "arn:aws:iam::039357025951:user/terraform-admin"
+}
