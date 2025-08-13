@@ -579,6 +579,7 @@ class MyAIGist {
         const summarySection = document.getElementById('summary-section');
         const summaryText = document.getElementById('summary-text');
         const summaryAudio = document.getElementById('summary-audio');
+        const audioLoading = document.getElementById('audio-loading');
         const levelBadge = document.getElementById('summary-level-indicator');
 
         if (summaryText) summaryText.textContent = summary;
@@ -590,6 +591,15 @@ class MyAIGist {
                 summaryAudio.style.display = 'block';
             } else {
                 summaryAudio.style.display = 'none';
+            }
+        }
+        
+        // Hide audio loading indicator when audio URL is provided
+        if (audioLoading) {
+            if (audioUrl) {
+                audioLoading.classList.add('hidden');
+            } else {
+                audioLoading.classList.add('hidden'); // Initially hidden, will be shown when audio generation starts
             }
         }
 
@@ -931,9 +941,20 @@ class MyAIGist {
                     console.log('✅ Conditions met, calling generateAudioInBackground');
                     setTimeout(async () => {
                         try {
+                            // Show audio loading indicator
+                            const audioLoading = document.getElementById('audio-loading');
+                            if (audioLoading) {
+                                audioLoading.classList.remove('hidden');
+                            }
+                            
                             await this.generateAudioInBackground(summaryText, data.voice || this.selectedVoice);
                         } catch (audioError) {
                             console.error('❌ Audio generation failed with error:', audioError);
+                            // Hide loading indicator on error
+                            const audioLoading = document.getElementById('audio-loading');
+                            if (audioLoading) {
+                                audioLoading.classList.add('hidden');
+                            }
                         }
                     }, 1000); // Add small delay to ensure UI is ready
                 } else {
@@ -977,14 +998,26 @@ class MyAIGist {
                 if (audioData.success && audioData.audio_url) {
                     // Update the summary section with audio
                     const summaryAudio = document.getElementById('summary-audio');
+                    const audioLoading = document.getElementById('audio-loading');
+                    
                     if (summaryAudio) {
                         summaryAudio.src = audioData.audio_url;
                         summaryAudio.style.display = 'block';
                         console.log('✅ Audio generated and added to summary');
                     }
+                    
+                    // Hide the audio loading indicator
+                    if (audioLoading) {
+                        audioLoading.classList.add('hidden');
+                    }
                 }
             } else {
                 console.warn('⚠️ Audio generation failed, continuing without audio');
+                // Hide loading indicator on failure
+                const audioLoading = document.getElementById('audio-loading');
+                if (audioLoading) {
+                    audioLoading.classList.add('hidden');
+                }
             }
             
             // Restore original status or clear loading status
@@ -999,6 +1032,11 @@ class MyAIGist {
             
         } catch (error) {
             console.warn('⚠️ Background audio generation failed:', error.message);
+            // Hide loading indicator on error
+            const audioLoading = document.getElementById('audio-loading');
+            if (audioLoading) {
+                audioLoading.classList.add('hidden');
+            }
             // Don't show error to user since audio is optional
         }
     }

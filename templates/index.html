@@ -366,6 +366,45 @@
             border-color: #667eea;
         }
         
+        /* Audio loading indicator styles */
+        .audio-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px 20px;
+            margin: 15px 0;
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .audio-loading-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #667eea;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         @media (max-width: 768px) {
             .nav-header {
                 flex-direction: column;
@@ -507,6 +546,12 @@
                 <span id="summary-level-indicator" class="summary-level-badge">Standard</span>
             </div>
             <div id="summary-text" class="summary-text"></div>
+            <div id="audio-loading" class="audio-loading hidden">
+                <div class="audio-loading-content">
+                    <div class="loading-spinner"></div>
+                    <span class="loading-text">🎵 Generating audio summary...</span>
+                </div>
+            </div>
             <audio id="summary-audio" controls class="audio-player"></audio>
         </section>
 
