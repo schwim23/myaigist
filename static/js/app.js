@@ -977,6 +977,8 @@ class MyAIGist {
                             const audioLoading = document.getElementById('audio-loading');
                             if (audioLoading) {
                                 audioLoading.classList.add('hidden');
+                                audioLoading.style.display = 'none';
+                                console.log('❌ Audio loading indicator hidden due to error');
                             }
                         }
                     }, 1000); // Add small delay to ensure UI is ready
@@ -1032,6 +1034,8 @@ class MyAIGist {
                     // Hide the audio loading indicator
                     if (audioLoading) {
                         audioLoading.classList.add('hidden');
+                        audioLoading.style.display = 'none';
+                        console.log('✅ Audio loading indicator hidden');
                     }
                 }
             } else {
@@ -1040,6 +1044,8 @@ class MyAIGist {
                 const audioLoading = document.getElementById('audio-loading');
                 if (audioLoading) {
                     audioLoading.classList.add('hidden');
+                    audioLoading.style.display = 'none';
+                    console.log('⚠️ Audio loading indicator hidden due to generation failure');
                 }
             }
             
@@ -1059,6 +1065,8 @@ class MyAIGist {
             const audioLoading = document.getElementById('audio-loading');
             if (audioLoading) {
                 audioLoading.classList.add('hidden');
+                audioLoading.style.display = 'none';
+                console.log('❌ Audio loading indicator hidden due to background generation error');
             }
             // Don't show error to user since audio is optional
         }
