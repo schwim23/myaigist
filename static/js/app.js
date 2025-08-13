@@ -1115,28 +1115,59 @@ class MyAIGist {
             return;
         }
 
+        const textToCopy = summaryText.textContent;
+        let copySuccess = false;
+
         try {
-            await navigator.clipboard.writeText(summaryText.textContent);
-            this.showStatus('✅ Summary copied to clipboard!', 'success');
-            
-            // Track event for analytics
-            this.trackEvent('summary_copied', {
-                content_length: summaryText.textContent.length,
-                summary_level: this.selectedSummaryLevel
-            });
-            
-            // Visual feedback on button
-            const copyBtn = document.getElementById('copy-summary-btn');
-            if (copyBtn) {
-                const originalText = copyBtn.innerHTML;
-                copyBtn.innerHTML = '✅ Copied!';
-                setTimeout(() => {
-                    copyBtn.innerHTML = originalText;
-                }, 2000);
+            // Try modern clipboard API first (requires HTTPS)
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(textToCopy);
+                copySuccess = true;
+            } else {
+                // Fallback for HTTP environments
+                const textArea = document.createElement('textarea');
+                textArea.value = textToCopy;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-9999px';
+                textArea.style.top = '-9999px';
+                document.body.appendChild(textArea);
+                
+                textArea.focus();
+                textArea.select();
+                
+                try {
+                    copySuccess = document.execCommand('copy');
+                } catch (fallbackErr) {
+                    console.error('Fallback copy failed:', fallbackErr);
+                }
+                
+                document.body.removeChild(textArea);
+            }
+
+            if (copySuccess) {
+                this.showStatus('✅ Summary copied to clipboard!', 'success');
+                
+                // Track event for analytics
+                this.trackEvent('summary_copied', {
+                    content_length: textToCopy.length,
+                    summary_level: this.selectedSummaryLevel
+                });
+                
+                // Visual feedback on button
+                const copyBtn = document.getElementById('copy-summary-btn');
+                if (copyBtn) {
+                    const originalText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '✅ Copied!';
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalText;
+                    }, 2000);
+                }
+            } else {
+                throw new Error('Copy operation failed');
             }
         } catch (err) {
             console.error('Failed to copy to clipboard:', err);
-            this.showStatus('❌ Failed to copy to clipboard', 'error');
+            this.showStatus('❌ Failed to copy to clipboard. Please select and copy the text manually.', 'error');
         }
     }
 
