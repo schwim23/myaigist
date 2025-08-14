@@ -542,7 +542,7 @@ class MyAIGist {
         const levelNames = { quick: 'Quick', standard: 'Standard', detailed: 'Detailed' };
         this.showStatus(`Processing ${this.selectedInputs.length} input(s) with ${levelNames[this.selectedSummaryLevel]} summary...`, 'loading');
 
-        const response = await fetch('/api/multi-upload', {
+        const response = await fetch('/api/upload-multiple-files', {
             method: 'POST',
             body: formData
         });
@@ -1431,9 +1431,14 @@ class MyAIGist {
 
     showWarning() {
         const existingWarning = document.querySelector('.input-limit-warning');
-        if (existingWarning) return;
-
         const inputsContainer = document.getElementById('selected-inputs');
+        
+        if (existingWarning) {
+            // Update existing warning with current count
+            existingWarning.textContent = `${5 - this.selectedInputs.length} input slot(s) remaining`;
+            return;
+        }
+
         const warning = document.createElement('div');
         warning.className = 'input-limit-warning';
         warning.textContent = `${5 - this.selectedInputs.length} input slot(s) remaining`;
