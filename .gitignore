@@ -459,6 +459,8 @@ htmlcov/
 current-task-def.json
 prod-task-definition-*.json
 qa-task-definition-*.json
+task-definition-*.json
+*task-definition*.json
 
 # ========================================
 # DOCUMENTATION
