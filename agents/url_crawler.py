@@ -144,14 +144,18 @@ class UrlCrawler:
         try:
             # Remove script, style, and other non-content elements
             for element in soup(['script', 'style', 'nav', 'header', 'footer', 
-                               'aside', 'meta', 'link', 'noscript']):
+                               'aside', 'meta', 'link', 'noscript', 'sup', 
+                               '.navbox', '.infobox', '.mbox', '.sidebar',
+                               '.navigation-not-searchable', '.printfooter']):
                 element.decompose()
             
             # Try to find main content areas first
             main_content = None
             
-            # Look for common content containers
+            # Look for common content containers (Wikipedia-specific first)
             content_selectors = [
+                '#mw-content-text',  # Wikipedia main content
+                '.mw-parser-output',  # Wikipedia article content
                 'main', 'article', '[role="main"]', '.content', '.post-content',
                 '.entry-content', '.article-content', '.post-body', '.content-body'
             ]
