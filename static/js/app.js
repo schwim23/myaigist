@@ -810,7 +810,7 @@ class MyAIGist {
                             ${docType} • ${formattedDate} • ${doc.chunk_count} chunks
                         </div>
                     </div>
-                    <button class="file-delete" onclick="myAIGist.deleteDocument('${doc.doc_id}')" title="Delete document">
+                    <button class="file-delete" onclick="window.myAIGist.deleteDocument('${doc.doc_id}')" title="Delete document">
                         ×
                     </button>
                 </li>
@@ -1289,10 +1289,22 @@ class MyAIGist {
             const text = textarea.value.trim();
             if (!text) {
                 this.showStatus('❌ Please enter some text', 'error');
+                // Close modal after showing error
+                setTimeout(() => {
+                    if (document.body.contains(modal)) {
+                        document.body.removeChild(modal);
+                    }
+                }, 2000);
                 return;
             }
             if (text.length < 10) {
                 this.showStatus('❌ Text must be at least 10 characters', 'error');
+                // Close modal after showing error
+                setTimeout(() => {
+                    if (document.body.contains(modal)) {
+                        document.body.removeChild(modal);
+                    }
+                }, 2000);
                 return;
             }
 
@@ -1404,7 +1416,7 @@ class MyAIGist {
                             `<div class="input-item-meta">${this.formatFileSize(input.size)}</div>`
                         }
                     </div>
-                    <button class="input-item-remove" onclick="app.removeInput('${input.id}')" title="Remove">×</button>
+                    <button class="input-item-remove" onclick="window.myAIGist.removeInput('${input.id}')" title="Remove">×</button>
                 </div>
             `).join('');
 
