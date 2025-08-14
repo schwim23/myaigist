@@ -202,7 +202,7 @@ class QAAgent:
     
     def _get_relevant_context(self, question: str, top_k: int = 3) -> str:
         """
-        Simple context retrieval - just use all available document content
+        Simple context retrieval - use vector store data directly
         
         Args:
             question (str): User question
@@ -213,9 +213,34 @@ class QAAgent:
         """
         try:
             print(f"🔍 Getting context for: '{question}'")
-            print(f"📋 Available documents: {len(self.documents)}")
+            print(f"📋 In-memory documents: {len(self.documents)}")
+            print(f"📄 Vector store chunks: {len(self.vector_store.vectors) if hasattr(self.vector_store, 'vectors') else 0}")
             
-            # SIMPLE STRATEGY: Just return all document content
+            # Use vector store data directly if in-memory documents are empty
+            if not self.documents and hasattr(self.vector_store, 'metadata') and self.vector_store.metadata:
+                print("🔄 Using vector store data since in-memory documents are empty")
+                
+                # Group chunks by document
+                doc_chunks = {}
+                for metadata in self.vector_store.metadata:
+                    if not self.user_id or metadata.get('user_id') == self.user_id:
+                        doc_title = metadata.get('doc_title', metadata.get('title', 'Unknown'))
+                        if doc_title not in doc_chunks:
+                            doc_chunks[doc_title] = []
+                        doc_chunks[doc_title].append(metadata.get('text', ''))
+                
+                if doc_chunks:
+                    context_parts = []
+                    for doc_title, chunks in doc_chunks.items():
+                        # Combine chunks for this document
+                        full_text = ' '.join(chunks)
+                        context_parts.append(f"Document: {doc_title}\n{full_text}")
+                    
+                    context = "\n\n---\n\n".join(context_parts)
+                    print(f"✅ Returning context from vector store: {len(context)} characters from {len(doc_chunks)} documents")
+                    return context
+            
+            # Fallback to in-memory documents if available
             if self.documents:
                 context_parts = []
                 for doc in self.documents:
@@ -224,10 +249,10 @@ class QAAgent:
                 
                 if context_parts:
                     context = "\n\n---\n\n".join(context_parts)
-                    print(f"✅ Returning context: {len(context)} characters from {len(context_parts)} documents")
+                    print(f"✅ Returning context from memory: {len(context)} characters from {len(context_parts)} documents")
                     return context
             
-            print("❌ No documents available")
+            print("❌ No documents available in memory or vector store")
             return ""
             
         except Exception as e:
