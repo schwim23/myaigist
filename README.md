@@ -6,17 +6,23 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**MyAIGist** is an intelligent AI-powered assistant that transforms any content into an interactive Q&A experience using **real semantic search with OpenAI embeddings**. Upload single or multiple documents, paste text, and get unified summaries with progressive UI updates. Ask questions using text or voice with responsive audio feedback.
+**MyAIGist** is an intelligent AI-powered assistant that transforms any content into an interactive Q&A experience using **real semantic search with OpenAI embeddings**. Upload documents, paste text, **or add website URLs** to get unified summaries with progressive UI updates. Ask questions using text or voice with responsive audio feedback.
 
 ![MyAIGist Demo](https://via.placeholder.com/800x400/667eea/ffffff?text=MyAIGist+Demo+Screenshot)
 
 ---
 
-## ✨ Latest Features (v2.1)
+## ✨ Latest Features (v3.0)
 
-### 🚀 **Multi-File Processing & Unified Summaries**
-- **Batch Upload**: Process up to 5 documents simultaneously (PDF, DOCX, TXT)
-- **Unified Summarization**: AI synthesizes content across ALL documents into single coherent summary
+### 🌐 **Website URL Crawling & Analysis** ⭐ NEW IN V3.0
+- **Smart Web Scraping**: Automatically extract and analyze content from any website URL
+- **Wikipedia Integration**: Optimized extraction for Wikipedia articles and educational content  
+- **Mixed Input Support**: Combine files, text, and URLs in single analysis (up to 5 total inputs)
+- **Intelligent Content Filtering**: Clean extraction removing navigation, ads, and irrelevant content
+
+### 🚀 **Multi-Input Processing & Unified Summaries**
+- **Mixed Content Batch**: Process documents, text entries, and website URLs simultaneously
+- **Unified Summarization**: AI synthesizes content across ALL inputs into single coherent summary
 - **Batch Embeddings**: Optimized performance with 75% faster processing via batch API calls
 - **Progressive UI**: Summaries appear instantly, audio loads in background for responsive experience
 
@@ -28,9 +34,10 @@
 
 ### 📄 **Enhanced Content Processing**
 - **Text Input**: Direct text analysis and processing
-- **Single & Multi-Document Upload**: PDF, DOCX, TXT with intelligent parsing
+- **Website URLs**: Automatic content extraction from any web page
+- **Multi-Document Upload**: PDF, DOCX, TXT with intelligent parsing
+- **Mixed Input System**: Unified interface supporting all content types with 5-item limit
 - **Smart File Validation**: Client and server-side validation with size limits
-- **Document Management**: File shelf with upload history and deletion capabilities
 
 ### 🎯 **Three-Level AI Summaries**
 - **⚡ Quick**: 2-3 key bullet points (300 tokens) for fast overview
@@ -131,6 +138,7 @@ docker run -p 8000:8000 --env-file .env myaigist
 
 ### **AI Agent System**
 - **DocumentProcessor**: Extracts text from PDF, DOCX, TXT files
+- **UrlCrawler**: Web scraping and content extraction from any website ⭐ NEW
 - **Summarizer**: Multi-level AI summarization with configurable models
 - **VectorStore**: Semantic embeddings with persistence for containers
 - **Embedder**: OpenAI embedding generation with batch support
@@ -165,6 +173,7 @@ myaigist/
 ├── agents/                   # AI agent modules
 │   ├── openai_client.py     # Centralized OpenAI client
 │   ├── document_processor.py # Document text extraction
+│   ├── url_crawler.py       # Website content extraction ⭐ NEW
 │   ├── summarizer.py        # Multi-level summarization
 │   ├── embeddings.py        # OpenAI embedding generation
 │   ├── vector_store.py      # Container-friendly vector storage
@@ -301,25 +310,36 @@ gtag('event', 'question_asked', {
 
 ## 🎯 Usage Examples
 
-### 1. **Multi-Document Analysis with Unified Summaries**
+### 1. **Mixed Content Analysis with Website URLs** ⭐ NEW
 ```bash
-1. Upload multiple documents (up to 5 files: PDF, DOCX, TXT)
-2. Select "Detailed" summary level for comprehensive analysis
-3. Get single unified summary synthesizing ALL documents together
-4. Ask: "What are the common themes across these documents?"
-5. Get precise answers from semantically relevant sections
+1. Add website URL: https://en.wikipedia.org/wiki/Machine_Learning
+2. Upload a research paper (PDF) and add some notes (text input)
+3. Select "Detailed" summary level for comprehensive analysis
+4. Get single unified summary combining web article + document + notes
+5. Ask: "How does the Wikipedia article relate to the research findings?"
+6. Get precise answers from semantically relevant sections across ALL sources
 ```
 
-### 2. **Progressive Voice-Powered Q&A**
+### 2. **Multi-Document Analysis with Unified Summaries**
 ```bash
-1. Upload documents or paste text - summary appears instantly
+1. Upload multiple documents (up to 5 files: PDF, DOCX, TXT)
+2. Add website URLs for additional context
+3. Select "Detailed" summary level for comprehensive analysis
+4. Get single unified summary synthesizing ALL inputs together
+5. Ask: "What are the common themes across these sources?"
+6. Get precise answers from semantically relevant sections
+```
+
+### 3. **Progressive Voice-Powered Q&A**
+```bash
+1. Upload documents, paste text, or add URLs - summary appears instantly
 2. Audio generates in background for responsive experience
 3. Click microphone and ask: "What are the key implications?"
 4. Get both text and audio response with progressive loading
 5. All interactions tracked in Google Analytics with event details
 ```
 
-### 3. **Container-Based Deployment with Version Tracking**
+### 4. **Container-Based Deployment with Version Tracking**
 ```bash
 1. Set environment variables in .env file
 2. Run: docker-compose up --build
@@ -357,13 +377,14 @@ Response:
 }
 ```
 
-### **Upload Multiple Files (NEW)**
+### **Upload Multiple Inputs - Files & URLs** ⭐ UPDATED IN V3.0
 ```http
 POST /api/upload-multiple-files
 Content-Type: multipart/form-data
 
-files: [file1.pdf, file2.docx, file3.txt]  // Up to 5 files
-summary_level: "standard"
+files: [file1.pdf, file2.docx]                    // Files (optional)
+urls: ["https://en.wikipedia.org/wiki/AI", "https://example.com/article"]  // URLs (optional)
+summary_level: "standard"                         // Up to 5 total inputs
 voice: "nova"
 
 Response:
@@ -372,15 +393,25 @@ Response:
   "results": [
     {
       "filename": "file1.pdf",
+      "type": "file", 
       "success": true,
       "summary": "Document summary...",
       "text_length": 2500,
       "qa_stored": true
+    },
+    {
+      "title": "Artificial intelligence - Wikipedia",
+      "type": "url",
+      "url": "https://en.wikipedia.org/wiki/AI",
+      "success": true,
+      "text_length": 125000,
+      "qa_stored": true
     }
   ],
-  "successful_uploads": 3,
-  "total_files": 3,
-  "combined_summary": "Unified analysis of 3 documents: ...",  // Single coherent summary
+  "successful_uploads": 4,
+  "total_files": 2,
+  "total_urls": 2,
+  "combined_summary": "Unified analysis of 4 inputs (2 files and 2 URLs): ...",  // Single coherent summary
   "audio_url": null,  // Generated via separate endpoint
   "voice": "nova"
 }
@@ -544,33 +575,35 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🚀 Roadmap
 
-### **Current Version: v2.1** ✅
+### **Current Version: v3.0** ✅
+- ✅ **Website URL Crawling**: Smart web scraping with content extraction
+- ✅ **Mixed Input Processing**: Files, text, and URLs in unified system
+- ✅ **Wikipedia Optimization**: Enhanced extraction for educational content
 - ✅ Real semantic search with OpenAI embeddings
-- ✅ Multi-file upload with unified summarization (up to 5 files)
+- ✅ Multi-input upload with unified summarization (up to 5 total)
 - ✅ Batch embedding processing for 75% faster performance
 - ✅ Progressive UI with instant summary display
 - ✅ Background audio generation for responsive experience
 - ✅ Terms of Service with legal protection
-- ✅ Document management with file shelf and deletion
 - ✅ Container-ready vector storage with persistence
 - ✅ Docker version tracking with Git commit SHAs
 - ✅ Google Analytics integration with comprehensive event tracking
 - ✅ AWS Fargate optimization with extended timeouts
 
-### **Upcoming Features: v2.2** 🔄
+### **Upcoming Features: v3.1** 🔄
 - 🔄 Streaming responses for real-time text generation
-- 🔄 Enhanced multi-document cross-referencing
+- 🔄 Enhanced cross-referencing between URLs and documents
 - 🔄 Advanced analytics dashboard with usage metrics
 - 🔄 API rate limiting and authentication
 - 🔄 File format expansion (PowerPoint, Excel, etc.)
 
-### **Future Enhancements: v3.0** 🔮
-- 💬 Multi-document cross-referencing and analysis
+### **Future Enhancements: v4.0** 🔮
 - 🤖 Custom embedding models and fine-tuning
 - ☁️ S3/MinIO integration for large file storage
 - 🔒 Enterprise SSO and user management
 - 📱 Progressive Web App (PWA) support
 - 🌐 Multi-language document processing
+- 🔗 Advanced URL validation and site-specific extractors
 
 ---
 

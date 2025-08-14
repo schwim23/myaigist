@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "myaigist-qa-container",
-      "image": "039357025951.dkr.ecr.us-east-1.amazonaws.com/myaigist:6bafc8776393801fd7e25bc5e2612e4e679da631",
+      "image": "039357025951.dkr.ecr.us-east-1.amazonaws.com/myaigist:debug-content",
       "portMappings": [
         {
           "containerPort": 8000,
@@ -38,4 +38,3 @@
     }
   ]
 }
-EOF < /dev/null
