@@ -92,7 +92,7 @@ class QAAgent:
                     'title': title,
                     'doc_title': title,
                     'upload_time': upload_time,
-                    'text': chunk[:100] + '...' if len(chunk) > 100 else chunk  # Preview for debugging
+                    'text': chunk  # Store full chunk text for context reconstruction
                 }
                 self.vector_store.add_text(chunk, metadata)
             
