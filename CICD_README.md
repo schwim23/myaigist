@@ -7,13 +7,13 @@ This document describes the CI/CD pipeline setup for MyAIGist with proper QA tes
 ### Production Environment
 - **Cluster**: `myaigist-cluster`
 - **Service**: `myaigist-service` 
-- **ECR**: `039357025951.dkr.ecr.us-east-1.amazonaws.com/myaigist`
-- **URL**: https://myaigist.ai
+- **ECR**: `<aws-account-id>.dkr.ecr.us-east-1.amazonaws.com/myaigist`
+- **URL**: https://myaigist.com
 
 ### QA Environment  
 - **Cluster**: `myaigist-qa-cluster`
 - **Service**: `myaigist-qa-service`
-- **ECR**: `039357025951.dkr.ecr.us-east-1.amazonaws.com/myaigist-qa`
+- **ECR**: `<aws-account-id>.dkr.ecr.us-east-1.amazonaws.com/myaigist-qa`
 - **Access**: Direct IP (changes with deployments)
 
 ## 🚀 Deployment Workflow
