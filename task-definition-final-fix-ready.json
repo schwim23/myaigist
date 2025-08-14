@@ -1,0 +1,36 @@
+{
+  "family": "myaigist-qa-task",
+  "taskRoleArn": "arn:aws:iam::039357025951:role/ecsTaskExecutionRole",
+  "executionRoleArn": "arn:aws:iam::039357025951:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "myaigist-qa-container",
+      "image": "039357025951.dkr.ecr.us-east-1.amazonaws.com/myaigist:6bafc8776393801fd7e25bc5e2612e4e679da631",
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "FLASK_ENV",
+          "value": "production"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/myaigist-qa",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

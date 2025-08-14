@@ -142,20 +142,24 @@ class UrlCrawler:
     def _extract_content(self, soup: BeautifulSoup) -> str:
         """Extract main text content from HTML"""
         try:
-            # Remove script, style, and other non-content elements
-            for element in soup(['script', 'style', 'nav', 'header', 'footer', 
-                               'aside', 'meta', 'link', 'noscript', 'sup', 
-                               '.navbox', '.infobox', '.mbox', '.sidebar',
-                               '.navigation-not-searchable', '.printfooter']):
+            # Remove script, style, and other non-content elements (be more selective)
+            for element in soup(['script', 'style', 'nav', 'header', 'footer']):
                 element.decompose()
+            
+            # Remove Wikipedia-specific clutter selectively
+            for selector in ['.navbox', '.mbox']:
+                for element in soup.select(selector):
+                    element.decompose()
             
             # Try to find main content areas first
             main_content = None
             
             # Look for common content containers (Wikipedia-specific first)
             content_selectors = [
+                '#mw-content-text .mw-parser-output',  # Wikipedia main article content
                 '#mw-content-text',  # Wikipedia main content
-                '.mw-parser-output',  # Wikipedia article content
+                '.mw-parser-output',  # Wikipedia article content  
+                '#content',  # Generic content
                 'main', 'article', '[role="main"]', '.content', '.post-content',
                 '.entry-content', '.article-content', '.post-body', '.content-body'
             ]
