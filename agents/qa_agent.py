@@ -154,7 +154,7 @@ class QAAgent:
         text = text.strip()
         return text
     
-    def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
+    def _chunk_text(self, text: str, chunk_size: int = 600, overlap: int = 100) -> List[str]:
         """
         Split text into overlapping chunks
         
@@ -202,80 +202,137 @@ class QAAgent:
     
     def _get_relevant_context(self, question: str, top_k: int = 3) -> str:
         """
-        Get most relevant text chunks for the question using embedding search
+        Simple context retrieval - just use all available document content
         
         Args:
             question (str): User question
-            top_k (int): Number of top chunks to return
+            top_k (int): Number of top chunks to return (unused in simple mode)
             
         Returns:
             str: Combined relevant context
         """
         try:
-            if not self.vector_store.vectors:
-                # Fallback: return first part of most recent document
-                if self.documents:
-                    latest_doc = self.documents[-1]
-                    print(f"🔄 Using fallback context from: {latest_doc['title']}")
-                    return latest_doc['text'][:2000]
-                return ""
+            print(f"🔍 Getting context for: '{question}'")
+            print(f"📋 Available documents: {len(self.documents)}")
             
-            print(f"🔍 Searching among {len(self.vector_store.vectors)} chunks for: '{question}'")
-            
-            # Use vector store similarity search with user filtering
-            search_results = self.vector_store.similarity_search(
-                query=question,
-                top_k=top_k,
-                min_similarity=0.1,  # Lower threshold for better matching
-                user_id=self.user_id
-            )
-            
-            if not search_results:
-                print("⚠️  No similar chunks found, trying with lower threshold")
-                search_results = self.vector_store.similarity_search(
-                    query=question,
-                    top_k=top_k,
-                    min_similarity=0.0,  # Try with no threshold
-                    user_id=self.user_id
-                )
-            
-            relevant_chunks = []
-            for i, result in enumerate(search_results):
-                similarity_score = result['similarity']
-                metadata = result['metadata']
-                chunk_text = metadata['text']
+            # SIMPLE STRATEGY: Just return all document content
+            if self.documents:
+                context_parts = []
+                for doc in self.documents:
+                    if doc.get('text'):
+                        context_parts.append(f"Document: {doc.get('title', 'Unknown')}\n{doc['text']}")
                 
-                print(f"  🎯 Chunk {i+1}: similarity={similarity_score:.3f}")
-                
-                # Show preview of matched chunk
-                preview = chunk_text[:100] + "..." if len(chunk_text) > 100 else chunk_text
-                print(f"    📝 Matched chunk: {preview}")
-                
-                relevant_chunks.append(f"[From: {metadata['title']}]\n{chunk_text}")
+                if context_parts:
+                    context = "\n\n---\n\n".join(context_parts)
+                    print(f"✅ Returning context: {len(context)} characters from {len(context_parts)} documents")
+                    return context
             
-            if not relevant_chunks:
-                # Ultimate fallback to most recent document
-                print("⚠️  No chunks found, using fallback")
-                if self.documents:
-                    latest_doc = self.documents[-1]
-                    return latest_doc['text'][:2000]
-                return ""
-            
-            context = "\n\n---\n\n".join(relevant_chunks)
-            print(f"✅ Final context length: {len(context)} characters from {len(relevant_chunks)} chunks")
-            
-            return context
+            print("❌ No documents available")
+            return ""
             
         except Exception as e:
-            print(f"❌ Error getting relevant context: {e}")
-            import traceback
-            traceback.print_exc()
-            # Fallback to most recent document
-            if self.documents:
-                latest_doc = self.documents[-1]
-                print(f"🔄 Using fallback - latest document: {latest_doc['title']}")
-                return latest_doc['text'][:2000]
+            print(f"❌ Error getting context: {e}")
             return ""
+    
+    def _keyword_search(self, question: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        """
+        Enhanced keyword-based search with better matching
+        
+        Args:
+            question (str): User question
+            top_k (int): Number of results to return
+            
+        Returns:
+            List[Dict]: Search results with metadata
+        """
+        try:
+            import re
+            question_lower = question.lower()
+            
+            # Extract keywords and create search patterns
+            stop_words = {'when', 'where', 'what', 'who', 'how', 'why', 'is', 'are', 'was', 'were', 'the', 'a', 'an', 'do', 'does', 'did'}
+            words = re.findall(r'\b\w+\b', question_lower)
+            keywords = [word for word in words if word not in stop_words and len(word) > 2]
+            
+            # Add common variations and synonyms
+            expanded_keywords = keywords.copy()
+            
+            # Question-specific keyword expansion
+            if 'established' in keywords or 'founded' in keywords:
+                expanded_keywords.extend(['established', 'founded', 'created', 'started', 'began'])
+            if 'play' in keywords and ('where' in question_lower or 'stadium' in question_lower):
+                expanded_keywords.extend(['stadium', 'venue', 'field', 'ballpark', 'home'])
+            if 'yankees' in keywords:
+                expanded_keywords.extend(['yankee', 'new york yankees'])
+            
+            print(f"🔤 Enhanced keyword search for: {keywords}")
+            print(f"🔍 Expanded keywords: {expanded_keywords}")
+            
+            results = []
+            
+            # Search through vector store metadata
+            if self.vector_store.metadata:
+                for i, metadata in enumerate(self.vector_store.metadata):
+                    if metadata.get('user_id') == self.user_id or not self.user_id:
+                        text_lower = metadata.get('text', '').lower()
+                        score = 0
+                        matched_keywords = []
+                        
+                        # Score based on keyword matches
+                        for keyword in expanded_keywords:
+                            count = text_lower.count(keyword)
+                            if count > 0:
+                                score += count * (2.0 if keyword in keywords else 1.0)  # Higher weight for original keywords
+                                matched_keywords.append(keyword)
+                        
+                        if score > 0:
+                            results.append({
+                                'similarity': score,
+                                'metadata': metadata,
+                                'index': i,
+                                'matched_keywords': matched_keywords
+                            })
+            
+            # Also search through full documents if vector search fails
+            if not results and self.documents:
+                print("🔍 Searching full documents with keywords")
+                for doc_idx, doc in enumerate(self.documents):
+                    if doc.get('text'):
+                        text_lower = doc['text'].lower()
+                        score = 0
+                        matched_keywords = []
+                        
+                        for keyword in expanded_keywords:
+                            count = text_lower.count(keyword)
+                            if count > 0:
+                                score += count * (2.0 if keyword in keywords else 1.0)
+                                matched_keywords.append(keyword)
+                        
+                        if score > 0:
+                            # Create pseudo-metadata for document
+                            results.append({
+                                'similarity': score,
+                                'metadata': {
+                                    'text': doc['text'][:2000],  # Limit to first 2000 chars for display
+                                    'title': doc.get('title', 'Document'),
+                                    'user_id': self.user_id
+                                },
+                                'matched_keywords': matched_keywords
+                            })
+            
+            # Sort by score and return top results
+            results.sort(key=lambda x: x['similarity'], reverse=True)
+            
+            if results:
+                print(f"📊 Keyword search found {len(results)} matches")
+                for i, result in enumerate(results[:3]):  # Show top 3
+                    print(f"  🎯 Match {i+1}: score={result['similarity']}, keywords={result.get('matched_keywords', [])}")
+            
+            return results[:top_k]
+            
+        except Exception as e:
+            print(f"❌ Enhanced keyword search error: {e}")
+            return []
     
     
     def _generate_answer(self, question: str, context: str) -> str:
@@ -291,15 +348,18 @@ class QAAgent:
         """
         system_prompt = """You are a helpful AI assistant that answers questions based on provided context.
 
-INSTRUCTIONS:
-1. Answer the question using ONLY the information provided in the context
-2. If the answer isn't clearly in the context, say so honestly
-3. Be specific and cite relevant parts when possible
-4. Keep answers concise but complete
-5. If context contains multiple sources, you can reference them
+Instructions:
+1. ALWAYS try to find the answer in the provided context first
+2. If the information exists in the context, provide it directly and confidently
+3. Extract specific facts, dates, numbers, and details from the context
+4. Be direct and specific - don't say "the context doesn't specify" if the information is there
+5. Only say information is not available if it truly cannot be found in the context"""
 
-Format your response naturally and conversationally."""
-
+        print(f"🔍 ANSWER GENERATION DEBUG:")
+        print(f"  📝 Context length: {len(context)} characters")
+        print(f"  🎯 Question: {question}")
+        print(f"  📄 Context preview: {context[:500]}...")
+        
         user_prompt = f"""Context:
 {context}
 
@@ -315,8 +375,8 @@ Please answer the question based on the context provided above."""
                     {"role": "user", "content": user_prompt}
                 ],
                 max_tokens=500,
-                temperature=0.7,
-                top_p=0.9
+                temperature=0.1,
+                top_p=0.95
             )
             
             return response.choices[0].message.content.strip()

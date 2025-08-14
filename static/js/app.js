@@ -109,6 +109,14 @@ class MyAIGist {
             });
         }
 
+        const addUrlBtn = document.getElementById('add-url-btn');
+        if (addUrlBtn) {
+            addUrlBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showUrlInputModal();
+            });
+        }
+
         const fileInput = document.getElementById('file-input');
         if (fileInput) {
             fileInput.addEventListener('change', (e) => {
@@ -196,6 +204,17 @@ class MyAIGist {
         try {
             this.hidePlaybackSection();
 
+            // Check if we're on HTTPS or localhost (required for getUserMedia)
+            const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
+            if (!isSecureContext) {
+                throw new Error('Microphone recording requires HTTPS connection. Please use HTTPS or localhost.');
+            }
+
+            // Check if getUserMedia is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Microphone recording is not supported in this browser.');
+            }
+
             console.log('🎤 Requesting microphone access...');
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: { sampleRate: 44100, channelCount: 1, echoCancellation: true, noiseSuppression: true }
@@ -235,9 +254,18 @@ class MyAIGist {
         } catch (error) {
             console.error('❌ Error starting recording:', error);
             let errorMessage = 'Could not access microphone. ';
-            if (error.name === 'NotAllowedError') errorMessage += 'Please allow microphone access and try again.';
-            else if (error.name === 'NotFoundError') errorMessage += 'No microphone found.';
-            else errorMessage += error.message;
+            
+            if (error.message.includes('HTTPS')) {
+                errorMessage = '🔒 Microphone recording requires a secure HTTPS connection. Please use HTTPS or localhost to access this feature.';
+            } else if (error.name === 'NotAllowedError') {
+                errorMessage += 'Please allow microphone access and try again.';
+            } else if (error.name === 'NotFoundError') {
+                errorMessage += 'No microphone found.';
+            } else if (error.message.includes('not supported')) {
+                errorMessage = 'Microphone recording is not supported in this browser.';
+            } else {
+                errorMessage += error.message;
+            }
 
             this.showStatus(errorMessage, 'error');
             this.resetRecordingState();
@@ -423,12 +451,13 @@ class MyAIGist {
         }
 
         try {
-            // Separate text and file inputs
+            // Separate text, file, and URL inputs
             const textInputs = this.selectedInputs.filter(input => input.type === 'text');
             const fileInputs = this.selectedInputs.filter(input => input.type === 'file');
+            const urlInputs = this.selectedInputs.filter(input => input.type === 'url');
 
-            // If we have multiple inputs or any files, use multi-input processing
-            if (this.selectedInputs.length > 1 || fileInputs.length > 0) {
+            // If we have multiple inputs or any files or any URLs, use multi-input processing
+            if (this.selectedInputs.length > 1 || fileInputs.length > 0 || urlInputs.length > 0) {
                 return this.processMultipleInputs();
             }
 
@@ -523,6 +552,7 @@ class MyAIGist {
         const formData = new FormData();
         const textInputs = this.selectedInputs.filter(input => input.type === 'text');
         const fileInputs = this.selectedInputs.filter(input => input.type === 'file');
+        const urlInputs = this.selectedInputs.filter(input => input.type === 'url');
         
         // Add files
         fileInputs.forEach((input, index) => {
@@ -534,6 +564,11 @@ class MyAIGist {
             const textBlob = new Blob([input.content], { type: 'text/plain' });
             const textFile = new File([textBlob], `${input.title}.txt`, { type: 'text/plain' });
             formData.append('files', textFile);
+        });
+        
+        // Add URLs as separate parameter
+        urlInputs.forEach((input, index) => {
+            formData.append('urls', input.url);
         });
         
         formData.append('summary_level', this.selectedSummaryLevel);
@@ -574,6 +609,7 @@ class MyAIGist {
                 total_inputs: this.selectedInputs.length,
                 text_inputs: textInputs.length,
                 file_inputs: fileInputs.length,
+                url_inputs: urlInputs.length,
                 summary_level: this.selectedSummaryLevel
             });
             
@@ -634,7 +670,8 @@ class MyAIGist {
             const response = await fetch('/api/ask-question', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ question: questionText, voice: this.selectedVoice })
+                body: JSON.stringify({ question: questionText, voice: this.selectedVoice }),
+                credentials: 'include'  // Include session cookies
             });
 
             if (!response.ok) {
@@ -1320,6 +1357,91 @@ class MyAIGist {
         });
     }
 
+    showUrlInputModal() {
+        if (this.selectedInputs.length >= 5) {
+            this.showStatus('❌ Maximum 5 inputs allowed', 'error');
+            return;
+        }
+
+        // Create modal HTML
+        const modal = document.createElement('div');
+        modal.className = 'text-input-modal';
+        modal.innerHTML = `
+            <div class="text-input-modal-content">
+                <h3>🔗 Add Website URL</h3>
+                <input 
+                    type="url" 
+                    id="modal-url-input" 
+                    placeholder="https://example.com"
+                    style="width: 100%; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px; background: rgba(255, 255, 255, 0.95); color: #333; font-size: 0.9rem; box-sizing: border-box;"
+                />
+                <p style="color: rgba(255, 255, 255, 0.8); font-size: 0.85rem; margin: 8px 0 0 0;">
+                    Enter a valid website URL to extract and analyze its content
+                </p>
+                <div class="text-input-modal-actions">
+                    <button class="text-input-modal-btn cancel">Cancel</button>
+                    <button class="text-input-modal-btn add">Add URL</button>
+                </div>
+            </div>
+        `;
+
+        // Add to body
+        document.body.appendChild(modal);
+
+        // Focus input
+        const urlInput = modal.querySelector('#modal-url-input');
+        setTimeout(() => urlInput.focus(), 100);
+
+        // Handle buttons
+        const cancelBtn = modal.querySelector('.cancel');
+        const addBtn = modal.querySelector('.add');
+
+        cancelBtn.addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+
+        addBtn.addEventListener('click', () => {
+            const url = urlInput.value.trim();
+            if (!url) {
+                this.showStatus('❌ Please enter a URL', 'error');
+                setTimeout(() => {
+                    if (document.body.contains(modal)) {
+                        document.body.removeChild(modal);
+                    }
+                }, 2000);
+                return;
+            }
+            
+            // Validate URL format
+            if (!this.isValidUrl(url)) {
+                this.showStatus('❌ Please enter a valid URL (e.g., https://example.com)', 'error');
+                setTimeout(() => {
+                    if (document.body.contains(modal)) {
+                        document.body.removeChild(modal);
+                    }
+                }, 2000);
+                return;
+            }
+
+            this.addUrlInput(url);
+            document.body.removeChild(modal);
+        });
+
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+
+        // Handle Enter key
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addBtn.click();
+            }
+        });
+    }
+
     addTextInput(text) {
         const textInput = {
             id: `text_${Date.now()}`,
@@ -1333,6 +1455,39 @@ class MyAIGist {
         this.selectedInputs.push(textInput);
         this.updateInputDisplay();
         this.showStatus('✅ Text entry added!', 'success');
+    }
+
+    isValidUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+        } catch (_) {
+            return false;
+        }
+    }
+
+    addUrlInput(url) {
+        const urlInput = {
+            id: `url_${Date.now()}`,
+            type: 'url',
+            url: url,
+            title: this.getDomainFromUrl(url),
+            preview: `Website content from: ${url}`,
+            size: url.length
+        };
+
+        this.selectedInputs.push(urlInput);
+        this.updateInputDisplay();
+        this.showStatus('✅ Website URL added!', 'success');
+    }
+
+    getDomainFromUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            return urlObj.hostname.replace('www.', '');
+        } catch (_) {
+            return 'Website';
+        }
     }
 
     handleFileSelection(files) {
@@ -1403,7 +1558,7 @@ class MyAIGist {
             inputsList.innerHTML = this.selectedInputs.map(input => `
                 <div class="input-item" data-id="${input.id}">
                     <div class="input-item-icon">
-                        ${input.type === 'text' ? '📝' : '📄'}
+                        ${input.type === 'text' ? '📝' : input.type === 'url' ? '🔗' : '📄'}
                     </div>
                     <div class="input-item-content">
                         <div class="input-item-header">
@@ -1413,6 +1568,8 @@ class MyAIGist {
                         <p class="input-item-preview">${this.escapeHtml(input.preview)}</p>
                         ${input.type === 'text' ? 
                             `<div class="input-item-meta">${input.size} characters</div>` :
+                            input.type === 'url' ?
+                            `<div class="input-item-meta">Website • ${input.url}</div>` :
                             `<div class="input-item-meta">${this.formatFileSize(input.size)}</div>`
                         }
                     </div>

@@ -16,6 +16,7 @@ try:
     from agents.summarizer import Summarizer  
     from agents.transcriber import Transcriber
     from agents.qa_agent import QAAgent
+    from agents.url_crawler import url_crawler
     print("✅ Successfully imported all agent modules")
 except ImportError as e:
     print(f"❌ Import error: {e}")
@@ -142,30 +143,54 @@ def get_user_identifier():
 # Session-based QA agent management
 def get_session_qa_agent():
     """Get or create a QA agent for the current session"""
-    # Make session permanent for better persistence
-    session.permanent = True
-    
-    if 'session_id' not in session:
-        session['session_id'] = secrets.token_hex(8)
-        session['created_at'] = str(datetime.now())
-        print(f"🆔 Created new session: {session['session_id']}")
-    else:
-        print(f"🔄 Using existing session: {session['session_id']}")
-    
-    session_id = session['session_id']
-    print(f"🔍 DEBUG: Session ID: {session_id}")
-    print(f"🔍 DEBUG: Session created: {session.get('created_at', 'Unknown')}")
-    print(f"🔍 DEBUG: Session keys: {list(session.keys())}")
-    
     try:
+        print(f"🔍 =========================")
+        print(f"🔍 GET_SESSION_QA_AGENT DEBUG START")
+        print(f"🔍 =========================")
+        
+        # Make session permanent for better persistence
+        session.permanent = True
+        
+        if 'session_id' not in session:
+            session['session_id'] = secrets.token_hex(8)
+            session['created_at'] = str(datetime.now())
+            print(f"🆔 Created new session: {session['session_id']}")
+        else:
+            print(f"🔄 Using existing session: {session['session_id']}")
+        
+        session_id = session['session_id']
+        print(f"🔍 DEBUG: Session ID: {session_id}")
+        print(f"🔍 DEBUG: Session created: {session.get('created_at', 'Unknown')}")
+        print(f"🔍 DEBUG: Session keys: {list(session.keys())}")
+        
+        # Check data directory and permissions
+        data_dir = "data"
+        print(f"🔍 DEBUG: Checking data directory: {data_dir}")
+        if not os.path.exists(data_dir):
+            print(f"📁 Creating data directory: {data_dir}")
+            os.makedirs(data_dir, exist_ok=True)
+        
+        # Test write permissions
+        test_file = os.path.join(data_dir, f"test_write_{session_id}.tmp")
+        try:
+            with open(test_file, 'w') as f:
+                f.write("test")
+            os.remove(test_file)
+            print(f"✅ Data directory write permissions: OK")
+        except Exception as write_error:
+            print(f"❌ Data directory write test failed: {write_error}")
+        
         # Import here to avoid circular imports
         from agents.qa_agent import QAAgent
         
         # Get user identifier for multi-user isolation
         user_id = get_user_identifier()
+        print(f"🔍 DEBUG: User ID: {user_id}")
         
         # Use shared multi-user vector store in production, session-based for local development
         flask_env = os.getenv('FLASK_ENV', 'development')
+        print(f"🔍 DEBUG: Flask environment: {flask_env}")
+        
         if flask_env == 'production':
             print(f"🏭 Production mode: Using shared multi-user vector store")
             qa = QAAgent(session_id="shared", user_id=user_id)  # Shared store with user isolation
@@ -437,10 +462,38 @@ def ask_question():
     print(f"🔍 ASK QUESTION DEBUG START")
     print(f"🔍 =========================")
     
-    # Get session-based QA agent
-    session_qa = get_session_qa_agent()
-    if not session_qa:
-        return jsonify({'error': 'Q&A agent not available. Please check server logs.'}), 500
+    try:
+        print(f"🔍 DEBUG: Request method: {request.method}")
+        print(f"🔍 DEBUG: Request content type: {request.content_type}")
+        
+        # Get session-based QA agent
+        print(f"🔍 DEBUG: Getting session QA agent...")
+        session_qa = get_session_qa_agent()
+        print(f"🔍 DEBUG: Session QA agent result: {session_qa is not None}")
+        
+        if not session_qa:
+            print(f"❌ DEBUG: No session QA agent available!")
+            return jsonify({'error': 'Q&A agent not available. Please check server logs.'}), 500
+        
+        print(f"✅ DEBUG: Session QA agent ready")
+        
+        # DEBUG: Check if QA agent has any documents
+        print(f"🔍 DEBUG: QA agent has {len(session_qa.documents)} documents")
+        if session_qa.documents:
+            for i, doc in enumerate(session_qa.documents):
+                print(f"  📄 Document {i+1}: {doc.get('title', 'No title')} ({doc.get('type', 'unknown type')})")
+                print(f"    📝 Text length: {len(doc.get('text', ''))}")
+                if doc.get('type') == 'url':
+                    print(f"    🔗 URL: {doc.get('url', 'No URL')}")
+        else:
+            print(f"❌ DEBUG: No documents found in QA agent!")
+            print(f"🔍 DEBUG: This explains why Q&A returns 'not specified'")
+        
+    except Exception as init_error:
+        print(f"❌ DEBUG: Error in ask_question initialization: {init_error}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Initialization error: {str(init_error)}'}), 500
     
     try:
         data = request.get_json()
@@ -735,18 +788,24 @@ def delete_document():
 
 @app.route('/api/upload-multiple-files', methods=['POST'])
 def upload_multiple_files():
-    """Upload multiple files at once with optimized batch processing"""
+    """Process multiple files and URLs with optimized batch processing"""
     try:
-        if 'files' not in request.files:
-            return jsonify({'error': 'No files uploaded'}), 400
+        # Get files and URLs
+        files = request.files.getlist('files') if 'files' in request.files else []
+        urls = request.form.getlist('urls') if 'urls' in request.form else []
         
-        files = request.files.getlist('files')
-        if not files or all(file.filename == '' for file in files):
-            return jsonify({'error': 'No files selected'}), 400
+        # Remove empty entries
+        files = [f for f in files if f.filename != '']
+        urls = [u for u in urls if u.strip()]
         
-        # Check file count limit
-        if len(files) > 5:
-            return jsonify({'error': 'Maximum 5 files allowed per upload'}), 400
+        total_inputs = len(files) + len(urls)
+        
+        if total_inputs == 0:
+            return jsonify({'error': 'No files or URLs provided'}), 400
+        
+        # Check input count limit
+        if total_inputs > 5:
+            return jsonify({'error': 'Maximum 5 inputs allowed per upload'}), 400
         
         # Get optional parameters
         summary_level = request.form.get('summary_level', 'standard')
@@ -755,9 +814,11 @@ def upload_multiple_files():
         session_qa = get_session_qa_agent()
         user_id = get_user_identifier()
         
-        # Phase 1: Extract and validate all files first
-        print("📄 Phase 1: Extracting text from all files...")
-        file_data = []
+        # Phase 1: Extract and validate all inputs (files and URLs)
+        print(f"📄 Phase 1: Processing {len(files)} files and {len(urls)} URLs...")
+        input_data = []
+        
+        # Process files
         for file in files:
             if file.filename == '':
                 continue
@@ -768,7 +829,8 @@ def upload_multiple_files():
             allowed_extensions = {'.pdf', '.docx', '.txt'}
             file_ext = os.path.splitext(filename.lower())[1]
             if file_ext not in allowed_extensions:
-                file_data.append({
+                input_data.append({
+                    'type': 'file',
                     'filename': filename,
                     'success': False,
                     'error': 'File type not allowed. Supported: PDF, DOCX, TXT'
@@ -783,54 +845,89 @@ def upload_multiple_files():
                 os.remove(file_path)
                 
                 if not text or len(text.strip()) < 10:
-                    file_data.append({
+                    input_data.append({
+                        'type': 'file',
                         'filename': filename,
                         'success': False,
                         'error': 'Could not extract text from file'
                     })
                     continue
                 
-                file_data.append({
+                input_data.append({
+                    'type': 'file',
                     'filename': filename,
                     'text': text,
                     'success': True
                 })
                 
             except Exception as e:
-                file_data.append({
+                input_data.append({
+                    'type': 'file',
                     'filename': filename,
                     'success': False,
                     'error': str(e)
                 })
         
+        # Process URLs
+        for url in urls:
+            try:
+                crawl_result = url_crawler.crawl_url(url)
+                
+                if crawl_result['success']:
+                    input_data.append({
+                        'type': 'url',
+                        'url': url,
+                        'title': crawl_result['title'],
+                        'text': crawl_result['content'],
+                        'success': True
+                    })
+                else:
+                    input_data.append({
+                        'type': 'url',
+                        'url': url,
+                        'title': url,
+                        'success': False,
+                        'error': crawl_result['error']
+                    })
+                    
+            except Exception as e:
+                input_data.append({
+                    'type': 'url',
+                    'url': url,
+                    'title': url,
+                    'success': False,
+                    'error': f'Error crawling URL: {str(e)}'
+                })
+        
         # Filter successful extractions
-        valid_files = [f for f in file_data if f.get('success', False)]
-        if not valid_files:
+        valid_inputs = [input_item for input_item in input_data if input_item.get('success', False)]
+        if not valid_inputs:
             return jsonify({
                 'success': False,
-                'results': file_data,
+                'results': input_data,
                 'successful_uploads': 0,
-                'total_files': len(file_data),
-                'error': 'No files could be processed'
+                'total_inputs': len(input_data),
+                'error': 'No inputs could be processed'
             })
         
-        print(f"✅ Successfully extracted text from {len(valid_files)} files")
+        print(f"✅ Successfully extracted text from {len(valid_inputs)} inputs ({len([i for i in valid_inputs if i['type'] == 'file'])} files, {len([i for i in valid_inputs if i['type'] == 'url'])} URLs)")
         
-        # Phase 2: Generate individual summaries only for single files or as fallback
-        if len(valid_files) == 1:
-            print("📋 Phase 2: Generating summary for single file...")
-            file_entry = valid_files[0]
+        # Phase 2: Generate individual summaries only for single input or as fallback
+        if len(valid_inputs) == 1:
+            print("📋 Phase 2: Generating summary for single input...")
+            input_entry = valid_inputs[0]
             try:
-                summary = summarizer.summarize(file_entry['text'], detail_level=summary_level)
-                file_entry['summary'] = summary
+                summary = summarizer.summarize(input_entry['text'], detail_level=summary_level)
+                input_entry['summary'] = summary
             except Exception as e:
-                print(f"⚠️ Summary generation failed for {file_entry['filename']}: {e}")
-                file_entry['summary'] = f"Summary generation failed: {str(e)}"
+                input_name = input_entry.get('filename', input_entry.get('title', input_entry.get('url', 'Unknown')))
+                print(f"⚠️ Summary generation failed for {input_name}: {e}")
+                input_entry['summary'] = f"Summary generation failed: {str(e)}"
         else:
-            print(f"📋 Phase 2: Skipping individual summaries for multi-file upload (will generate unified summary)")
-            # For multi-file, we'll generate individual summaries only if unified summary fails
-            for file_entry in valid_files:
-                file_entry['summary'] = None  # Will be generated later if needed
+            print(f"📋 Phase 2: Skipping individual summaries for multi-input upload (will generate unified summary)")
+            # For multi-input, we'll generate individual summaries only if unified summary fails
+            for input_entry in valid_inputs:
+                input_entry['summary'] = None  # Will be generated later if needed
         
         # Phase 3: Optimized batch document storage
         print("🔄 Phase 3: Batch storing documents for Q&A...")
@@ -848,25 +945,37 @@ def upload_multiple_files():
             all_chunks = []
             chunk_metadata = []
             
-            for file_entry in valid_files:
+            for input_entry in valid_inputs:
                 try:
                     # Clean and chunk text
-                    cleaned_text = session_qa._clean_text(file_entry['text'])
+                    cleaned_text = session_qa._clean_text(input_entry['text'])
                     chunks = session_qa._chunk_text(cleaned_text)
                     
                     if chunks:
                         doc_id = str(uuid.uuid4())
                         upload_time = datetime.now().isoformat()
                         
+                        # Determine title based on input type
+                        if input_entry['type'] == 'file':
+                            title = input_entry['filename']
+                        else:  # URL
+                            title = input_entry['title']
+                        
                         # Add document to session
                         document = {
                             'doc_id': doc_id,
                             'user_id': user_id,
                             'text': cleaned_text,
-                            'title': file_entry['filename'],
+                            'title': title,
+                            'type': input_entry['type'],
                             'chunks': chunks,
                             'upload_time': upload_time
                         }
+                        
+                        # Add type-specific metadata
+                        if input_entry['type'] == 'url':
+                            document['url'] = input_entry['url']
+                        
                         session_qa.documents.append(document)
                         
                         # Collect chunks for batch processing
@@ -876,21 +985,23 @@ def upload_multiple_files():
                                 'user_id': user_id,
                                 'doc_id': doc_id,
                                 'chunk_index': chunk_index,
-                                'title': file_entry['filename'],
-                                'doc_title': file_entry['filename'],
+                                'title': title,
+                                'doc_title': title,
+                                'type': input_entry['type'],
                                 'upload_time': upload_time,
                                 'text': chunk[:100] + '...' if len(chunk) > 100 else chunk
                             })
                         
-                        file_entry['qa_stored'] = True
-                        file_entry['doc_id'] = doc_id
+                        input_entry['qa_stored'] = True
+                        input_entry['doc_id'] = doc_id
                         successful_uploads += 1
                     else:
-                        file_entry['qa_stored'] = False
+                        input_entry['qa_stored'] = False
                         
                 except Exception as e:
-                    print(f"❌ Error processing {file_entry['filename']}: {e}")
-                    file_entry['qa_stored'] = False
+                    input_name = input_entry.get('filename', input_entry.get('title', input_entry.get('url', 'Unknown')))
+                    print(f"❌ Error processing {input_name}: {e}")
+                    input_entry['qa_stored'] = False
             
             # Batch create embeddings for all chunks at once
             if all_chunks:
@@ -918,45 +1029,69 @@ def upload_multiple_files():
                 session_qa.vector_store.save()
                 print(f"✅ Batch processing complete: {len(all_chunks)} chunks processed")
         
-        # Update results for failed extractions
+        # Update results for all inputs
         results = []
-        for file_entry in file_data:
-            if file_entry.get('success', False):
-                results.append({
-                    'filename': file_entry['filename'],
+        for input_entry in input_data:
+            if input_entry.get('success', False):
+                result = {
                     'success': True,
-                    'summary': file_entry.get('summary', 'Summary not available'),
-                    'text_length': len(file_entry.get('text', '')),
-                    'qa_stored': file_entry.get('qa_stored', False)
-                })
+                    'type': input_entry['type'],
+                    'summary': input_entry.get('summary', 'Summary not available'),
+                    'text_length': len(input_entry.get('text', '')),
+                    'qa_stored': input_entry.get('qa_stored', False)
+                }
+                
+                # Add type-specific fields
+                if input_entry['type'] == 'file':
+                    result['filename'] = input_entry['filename']
+                else:  # URL
+                    result['url'] = input_entry['url']
+                    result['title'] = input_entry['title']
+                
+                results.append(result)
             else:
-                results.append({
-                    'filename': file_entry['filename'],
+                error_result = {
                     'success': False,
-                    'error': file_entry.get('error', 'Unknown error')
-                })
+                    'type': input_entry['type'],
+                    'error': input_entry.get('error', 'Unknown error')
+                }
+                
+                # Add type-specific fields for errors
+                if input_entry['type'] == 'file':
+                    error_result['filename'] = input_entry['filename']
+                else:  # URL
+                    error_result['url'] = input_entry['url']
+                
+                results.append(error_result)
         
         # Generate unified summary from all source texts (not individual summaries)
         combined_summary = None
         if successful_uploads > 1:
             # Collect all source texts for unified summarization
             source_texts = []
-            successful_files = []
+            successful_inputs = []
             
-            for file_entry in valid_files:
-                if file_entry.get('qa_stored', False):
-                    source_texts.append(file_entry['text'])
-                    successful_files.append(file_entry['filename'])
+            for input_entry in valid_inputs:
+                if input_entry.get('qa_stored', False):
+                    source_texts.append(input_entry['text'])
+                    if input_entry['type'] == 'file':
+                        successful_inputs.append(input_entry['filename'])
+                    else:  # URL
+                        successful_inputs.append(input_entry['title'])
             
             if source_texts:
                 # Create a unified document from all sources
-                unified_text = f"Combined analysis of {len(successful_files)} documents ({', '.join(successful_files)}):\n\n"
+                input_types = [f"{len([i for i in valid_inputs if i['type'] == 'file' and i.get('qa_stored', False)])} files" if any(i['type'] == 'file' for i in valid_inputs if i.get('qa_stored', False)) else "",
+                              f"{len([i for i in valid_inputs if i['type'] == 'url' and i.get('qa_stored', False)])} URLs" if any(i['type'] == 'url' for i in valid_inputs if i.get('qa_stored', False)) else ""]
+                input_types_str = " and ".join([t for t in input_types if t])
                 
-                # Add each document with a clear separator and title
-                for i, (filename, text) in enumerate(zip(successful_files, source_texts), 1):
-                    unified_text += f"=== Document {i}: {filename} ===\n\n{text}\n\n"
+                unified_text = f"Combined analysis of {len(successful_inputs)} inputs ({input_types_str}): {', '.join(successful_inputs)}\n\n"
                 
-                print(f"🔄 Generating unified summary from {len(source_texts)} source documents")
+                # Add each input with a clear separator and title
+                for i, (input_name, text) in enumerate(zip(successful_inputs, source_texts), 1):
+                    unified_text += f"=== Input {i}: {input_name} ===\n\n{text}\n\n"
+                
+                print(f"🔄 Generating unified summary from {len(source_texts)} source inputs")
                 try:
                     # Generate a single unified summary from all combined texts
                     combined_summary = summarizer.summarize(unified_text, detail_level=summary_level)
@@ -966,18 +1101,19 @@ def upload_multiple_files():
                     
                     # Generate individual summaries as fallback
                     individual_summaries = []
-                    for file_entry in valid_files:
-                        if file_entry.get('qa_stored', False):
+                    for input_entry in valid_inputs:
+                        if input_entry.get('qa_stored', False):
+                            input_name = input_entry['filename'] if input_entry['type'] == 'file' else input_entry['title']
                             try:
-                                summary = summarizer.summarize(file_entry['text'], detail_level=summary_level)
-                                individual_summaries.append(f"**{file_entry['filename']}**: {summary}")
+                                summary = summarizer.summarize(input_entry['text'], detail_level=summary_level)
+                                individual_summaries.append(f"**{input_name}**: {summary}")
                             except Exception as summary_error:
-                                print(f"⚠️ Individual summary failed for {file_entry['filename']}: {summary_error}")
-                                individual_summaries.append(f"**{file_entry['filename']}**: Summary generation failed")
+                                print(f"⚠️ Individual summary failed for {input_name}: {summary_error}")
+                                individual_summaries.append(f"**{input_name}**: Summary generation failed")
                     
                     if individual_summaries:
                         combined_text = "\n\n".join(individual_summaries)
-                        combined_summary = f"Analysis of {successful_uploads} documents:\n\n" + combined_text
+                        combined_summary = f"Analysis of {successful_uploads} inputs:\n\n" + combined_text
         elif successful_uploads == 1:
             # Single file - use its individual summary
             for result in results:
@@ -990,7 +1126,9 @@ def upload_multiple_files():
             'success': successful_uploads > 0,
             'results': results,
             'successful_uploads': successful_uploads,
-            'total_files': len([f for f in file_data if f.get('filename')]),
+            'total_inputs': len(input_data),
+            'total_files': len([f for f in input_data if f.get('type') == 'file']),
+            'total_urls': len([f for f in input_data if f.get('type') == 'url']),
             'combined_summary': combined_summary,
             'audio_url': None,  # Will be generated separately
             'user_id': user_id,
