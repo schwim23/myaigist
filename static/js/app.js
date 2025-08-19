@@ -125,6 +125,14 @@ class MyAIGist {
             });
         }
 
+        const mediaInput = document.getElementById('media-input');
+        if (mediaInput) {
+            mediaInput.addEventListener('change', (e) => {
+                this.handleMediaSelection(Array.from(e.target.files));
+                e.target.value = ''; // Reset input for re-selection
+            });
+        }
+
         // Summary action buttons
         const copySummaryBtn = document.getElementById('copy-summary-btn');
         if (copySummaryBtn) {
@@ -451,14 +459,15 @@ class MyAIGist {
         }
 
         try {
-            // Separate text, file, and URL inputs
+            // Separate text, file, media, and URL inputs
             const textInputs = this.selectedInputs.filter(input => input.type === 'text');
             const fileInputs = this.selectedInputs.filter(input => input.type === 'file');
+            const mediaInputs = this.selectedInputs.filter(input => input.type === 'media');
             const urlInputs = this.selectedInputs.filter(input => input.type === 'url');
 
-            // If we have multiple inputs or any files or any URLs, use multi-input processing
-            if (this.selectedInputs.length > 1 || fileInputs.length > 0 || urlInputs.length > 0) {
-                return this.processMultipleInputs();
+            // If we have multiple inputs or any files or media or URLs, use multi-input processing
+            if (this.selectedInputs.length > 1 || fileInputs.length > 0 || mediaInputs.length > 0 || urlInputs.length > 0) {
+                return await this.processMultipleInputs();
             }
 
             // Single text input - use simple text processing
@@ -552,11 +561,17 @@ class MyAIGist {
         const formData = new FormData();
         const textInputs = this.selectedInputs.filter(input => input.type === 'text');
         const fileInputs = this.selectedInputs.filter(input => input.type === 'file');
+        const mediaInputs = this.selectedInputs.filter(input => input.type === 'media');
         const urlInputs = this.selectedInputs.filter(input => input.type === 'url');
         
-        // Add files
+        // Add regular files
         fileInputs.forEach((input, index) => {
             formData.append('files', input.file);
+        });
+        
+        // Add media files (separate field for backend processing)
+        mediaInputs.forEach((input, index) => {
+            formData.append('media_files', input.file);
         });
         
         // Add text entries as "virtual files"
@@ -609,6 +624,7 @@ class MyAIGist {
                 total_inputs: this.selectedInputs.length,
                 text_inputs: textInputs.length,
                 file_inputs: fileInputs.length,
+                media_inputs: mediaInputs.length,
                 url_inputs: urlInputs.length,
                 summary_level: this.selectedSummaryLevel
             });
@@ -636,13 +652,32 @@ class MyAIGist {
             // Clear inputs
             this.clearAllInputs();
         } else {
-            throw new Error(data.error || 'Multi-input processing failed');
+            // Show more detailed error information
+            const errorMsg = data.error || 'Processing failed';
+            console.error('❌ Processing failed:', data);
+            
+            // If there are results with errors, show them
+            if (data.results && data.results.length > 0) {
+                const failedResults = data.results.filter(r => !r.success);
+                if (failedResults.length > 0) {
+                    const errorDetails = failedResults.map(r => `${r.filename || r.url || 'Input'}: ${r.error}`).join('; ');
+                    throw new Error(`Processing failed: ${errorDetails}`);
+                }
+            }
+            
+            throw new Error(errorMsg);
         }
     }
 
     clearAllInputs() {
         this.selectedInputs = [];
         this.updateInputDisplay();
+        
+        // Also clear HTML input elements
+        const fileInput = document.getElementById('file-input');
+        const mediaInput = document.getElementById('media-input');
+        if (fileInput) fileInput.value = '';
+        if (mediaInput) mediaInput.value = '';
     }
 
     async askQuestion() {
@@ -1516,6 +1551,62 @@ class MyAIGist {
         this.showStatus(`✅ Added ${files.length} file(s)!`, 'success');
     }
 
+    handleMediaSelection(files) {
+        if (files.length === 0) return;
+
+        const remainingSlots = 5 - this.selectedInputs.length;
+        if (files.length > remainingSlots) {
+            this.showStatus(`❌ Can only add ${remainingSlots} more item(s). Maximum 5 inputs allowed.`, 'error');
+            return;
+        }
+
+        // Define supported media formats
+        const audioFormats = ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma', '.mpga'];
+        const videoFormats = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v', '.3gp', '.mpeg', '.mpg'];
+        const allMediaFormats = [...audioFormats, ...videoFormats];
+
+        // Filter and validate media files
+        const validMediaFiles = files.filter(file => {
+            const extension = '.' + file.name.split('.').pop().toLowerCase();
+            const isSupported = allMediaFormats.includes(extension);
+            
+            if (!isSupported) {
+                this.showStatus(`❌ Unsupported media format: ${file.name}`, 'error');
+                return false;
+            }
+            
+            // Check file size (25MB limit for Whisper)
+            if (file.size > 25 * 1024 * 1024) {
+                this.showStatus(`❌ File too large: ${file.name} (max 25MB)`, 'error');
+                return false;
+            }
+            
+            return true;
+        });
+
+        if (validMediaFiles.length === 0) return;
+
+        validMediaFiles.forEach(file => {
+            const extension = '.' + file.name.split('.').pop().toLowerCase();
+            const isVideo = videoFormats.includes(extension);
+            
+            const mediaInput = {
+                id: `media_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                type: 'media',
+                file: file,
+                title: file.name,
+                preview: `${isVideo ? '🎥 Video' : '🎵 Audio'} • ${this.formatFileSize(file.size)} • Will be transcribed`,
+                size: file.size,
+                mediaType: isVideo ? 'video' : 'audio'
+            };
+
+            this.selectedInputs.push(mediaInput);
+        });
+
+        this.updateInputDisplay();
+        this.showStatus(`✅ Added ${validMediaFiles.length} media file(s) for transcription!`, 'success');
+    }
+
     removeInput(inputId) {
         this.selectedInputs = this.selectedInputs.filter(input => input.id !== inputId);
         this.updateInputDisplay();
@@ -1558,7 +1649,10 @@ class MyAIGist {
             inputsList.innerHTML = this.selectedInputs.map(input => `
                 <div class="input-item" data-id="${input.id}">
                     <div class="input-item-icon">
-                        ${input.type === 'text' ? '📝' : input.type === 'url' ? '🔗' : '📄'}
+                        ${input.type === 'text' ? '📝' : 
+                          input.type === 'url' ? '🔗' : 
+                          input.type === 'media' ? (input.mediaType === 'video' ? '🎥' : '🎵') : 
+                          '📄'}
                     </div>
                     <div class="input-item-content">
                         <div class="input-item-header">

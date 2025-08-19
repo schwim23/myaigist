@@ -15,8 +15,13 @@ class Transcriber:
             self.audio_dir = Path('static/audio')
             self.audio_dir.mkdir(exist_ok=True)
             
-            # Supported audio formats for transcription
-            self.supported_formats = ['.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.wav', '.webm']
+            # Supported audio and video formats for transcription
+            self.supported_formats = [
+                # Audio formats
+                '.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma', '.mpga',
+                # Video formats (audio will be extracted)
+                '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v', '.3gp', '.mpeg', '.mpg'
+            ]
             
             print("✅ Transcriber initialized successfully")
             
@@ -24,39 +29,90 @@ class Transcriber:
             print(f"❌ Error initializing Transcriber: {e}")
             raise
     
-    def transcribe_audio(self, audio_file_path: str) -> str:
+    def transcribe_audio(self, media_file_path: str) -> str:
         """
-        Transcribe audio file using OpenAI Whisper
+        Transcribe audio or video file using OpenAI Whisper
         
         Args:
-            audio_file_path (str): Path to the audio file
+            media_file_path (str): Path to the audio or video file
             
         Returns:
             str: Transcribed text
         """
         try:
-            print(f"🎤 Transcribing audio file: {audio_file_path}")
+            print(f"🎬 Transcribing media file: {media_file_path}")
             
-            if not os.path.exists(audio_file_path):
-                raise FileNotFoundError(f"Audio file not found: {audio_file_path}")
+            if not os.path.exists(media_file_path):
+                raise FileNotFoundError(f"Media file not found: {media_file_path}")
             
             # Check file size (OpenAI has a 25MB limit)
-            file_size = os.path.getsize(audio_file_path)
+            file_size = os.path.getsize(media_file_path)
             if file_size > 25 * 1024 * 1024:  # 25MB
-                raise ValueError("Audio file too large. Maximum size is 25MB.")
+                raise ValueError("Media file too large. Maximum size is 25MB.")
             
             # Check if file extension is supported
-            file_ext = Path(audio_file_path).suffix.lower()
+            file_ext = Path(media_file_path).suffix.lower()
             if file_ext not in self.supported_formats:
                 print(f"⚠️  Unsupported format {file_ext}, attempting transcription anyway...")
             
-            # Transcribe using OpenAI Whisper
-            with open(audio_file_path, 'rb') as audio_file:
-                transcript = self.client.audio.transcriptions.create(
-                    model=os.getenv('OPENAI_WHISPER_MODEL', 'whisper-1'),
-                    file=audio_file,
-                    response_format="text"
-                )
+            # Determine if it's audio or video
+            video_formats = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v', '.3gp', '.mpeg', '.mpg']
+            is_video = file_ext in video_formats
+            
+            if is_video:
+                print(f"🎥 Processing video file: {file_ext} (audio will be extracted)")
+            else:
+                print(f"🎵 Processing audio file: {file_ext}")
+            
+            # Check if we need to convert the format for Whisper
+            whisper_supported_formats = ['.flac', '.m4a', '.mp3', '.mp4', '.mpeg', '.mpga', '.oga', '.ogg', '.wav', '.webm']
+            
+            if file_ext not in whisper_supported_formats:
+                # Convert unsupported formats (like .mov) to supported format
+                print(f"🔄 Converting {file_ext} to .mp4 for Whisper compatibility...")
+                import subprocess
+                temp_dir = tempfile.gettempdir()
+                converted_file = os.path.join(temp_dir, f"converted_{uuid.uuid4()}.mp4")
+                
+                try:
+                    # Use ffmpeg to convert to mp4
+                    result = subprocess.run([
+                        'ffmpeg', '-i', media_file_path, 
+                        '-c:a', 'aac', '-c:v', 'libx264', 
+                        '-y', converted_file
+                    ], capture_output=True, text=True, check=True)
+                    
+                    print(f"✅ Successfully converted {file_ext} to .mp4")
+                    
+                    # Transcribe the converted file
+                    with open(converted_file, 'rb') as media_file:
+                        transcript = self.client.audio.transcriptions.create(
+                            model=os.getenv('OPENAI_WHISPER_MODEL', 'whisper-1'),
+                            file=media_file,
+                            response_format="text"
+                        )
+                    
+                    # Clean up converted file
+                    if os.path.exists(converted_file):
+                        os.remove(converted_file)
+                        
+                except subprocess.CalledProcessError as e:
+                    error_msg = f"Failed to convert {file_ext} file: {e.stderr}"
+                    print(f"❌ {error_msg}")
+                    raise Exception(error_msg)
+                except Exception as e:
+                    # Clean up on any error
+                    if os.path.exists(converted_file):
+                        os.remove(converted_file)
+                    raise e
+            else:
+                # Direct transcription for supported formats
+                with open(media_file_path, 'rb') as media_file:
+                    transcript = self.client.audio.transcriptions.create(
+                        model=os.getenv('OPENAI_WHISPER_MODEL', 'whisper-1'),
+                        file=media_file,
+                        response_format="text"
+                    )
             
             # Handle both string and object responses
             if hasattr(transcript, 'text'):
@@ -64,13 +120,14 @@ class Transcriber:
             else:
                 transcribed_text = str(transcript)
             
-            print(f"✅ Successfully transcribed audio: {len(transcribed_text)} characters")
+            media_type = "video" if is_video else "audio"
+            print(f"✅ Successfully transcribed {media_type}: {len(transcribed_text)} characters")
             return transcribed_text.strip()
             
         except Exception as e:
-            error_msg = f"Error transcribing audio: {str(e)}"
+            error_msg = f"Error transcribing media: {str(e)}"
             print(f"❌ {error_msg}")
-            return error_msg
+            raise Exception(error_msg)
     
     def text_to_speech(self, text: str, voice: str = "nova") -> Optional[str]:
         """
@@ -121,12 +178,12 @@ class Transcriber:
             print(f"❌ Error generating speech: {e}")
             return None
     
-    def transcribe(self, audio_file) -> str:
+    def transcribe(self, media_file) -> str:
         """
-        Transcribe uploaded file object (Flask file upload)
+        Transcribe uploaded audio/video file object (Flask file upload)
         
         Args:
-            audio_file: Flask uploaded file object
+            media_file: Flask uploaded file object (audio or video)
             
         Returns:
             str: Transcribed text
@@ -134,11 +191,13 @@ class Transcriber:
         try:
             # Save uploaded file temporarily
             temp_dir = tempfile.gettempdir()
-            temp_filename = f"temp_audio_{uuid.uuid4()}{Path(audio_file.filename).suffix}"
+            temp_filename = f"temp_media_{uuid.uuid4()}{Path(media_file.filename).suffix}"
             temp_path = os.path.join(temp_dir, temp_filename)
             
+            print(f"🎬 Processing uploaded media file: {media_file.filename}")
+            
             # Save the uploaded file
-            audio_file.save(temp_path)
+            media_file.save(temp_path)
             
             try:
                 # Transcribe the temporary file
@@ -152,7 +211,7 @@ class Transcriber:
         except Exception as e:
             error_msg = f"Error transcribing uploaded file: {str(e)}"
             print(f"❌ {error_msg}")
-            return error_msg
+            raise Exception(error_msg)
     
     def cleanup_old_files(self, max_age_hours: int = 24):
         """
@@ -180,8 +239,25 @@ class Transcriber:
             print(f"⚠️  Error cleaning up audio files: {e}")
     
     def get_supported_formats(self) -> list:
-        """Get list of supported audio formats"""
+        """Get list of supported audio and video formats"""
         return self.supported_formats.copy()
+    
+    def get_audio_formats(self) -> list:
+        """Get list of supported audio formats only"""
+        audio_formats = ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma', '.mpga']
+        return audio_formats
+    
+    def get_video_formats(self) -> list:
+        """Get list of supported video formats only"""
+        video_formats = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v', '.3gp', '.mpeg', '.mpg']
+        return video_formats
+    
+    def is_media_file(self, filename: str) -> bool:
+        """Check if a filename is a supported media file"""
+        if not filename:
+            return False
+        file_ext = Path(filename).suffix.lower()
+        return file_ext in self.supported_formats
     
     def get_available_voices(self) -> list:
         """Get list of available TTS voices"""

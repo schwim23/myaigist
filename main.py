@@ -790,15 +790,17 @@ def delete_document():
 def upload_multiple_files():
     """Process multiple files and URLs with optimized batch processing"""
     try:
-        # Get files and URLs
+        # Get files, media files, and URLs
         files = request.files.getlist('files') if 'files' in request.files else []
+        media_files = request.files.getlist('media_files') if 'media_files' in request.files else []
         urls = request.form.getlist('urls') if 'urls' in request.form else []
         
         # Remove empty entries
         files = [f for f in files if f.filename != '']
+        media_files = [f for f in media_files if f.filename != '']
         urls = [u for u in urls if u.strip()]
         
-        total_inputs = len(files) + len(urls)
+        total_inputs = len(files) + len(media_files) + len(urls)
         
         if total_inputs == 0:
             return jsonify({'error': 'No files or URLs provided'}), 400
@@ -814,8 +816,8 @@ def upload_multiple_files():
         session_qa = get_session_qa_agent()
         user_id = get_user_identifier()
         
-        # Phase 1: Extract and validate all inputs (files and URLs)
-        print(f"📄 Phase 1: Processing {len(files)} files and {len(urls)} URLs...")
+        # Phase 1: Extract and validate all inputs (files, media files, and URLs)
+        print(f"📄 Phase 1: Processing {len(files)} files, {len(media_files)} media files, and {len(urls)} URLs...")
         input_data = []
         
         # Process files
@@ -868,6 +870,81 @@ def upload_multiple_files():
                     'error': str(e)
                 })
         
+        # Process media files (audio/video)
+        for media_file in media_files:
+            if media_file.filename == '':
+                continue
+                
+            filename = secure_filename(media_file.filename)
+            
+            # Check if it's a supported media format
+            if not transcriber.is_media_file(filename):
+                input_data.append({
+                    'type': 'media',
+                    'filename': filename,
+                    'success': False,
+                    'error': 'Media type not supported. Supported: Audio (MP3, WAV, M4A, etc.) and Video (MP4, AVI, MOV, etc.)'
+                })
+                continue
+                
+            # Check file size (25MB limit for Whisper)
+            if hasattr(media_file, 'content_length') and media_file.content_length:
+                file_size = media_file.content_length
+            else:
+                # Fallback: save temporarily to check size
+                temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_{uuid.uuid4()}_{filename}")
+                media_file.save(temp_path)
+                file_size = os.path.getsize(temp_path)
+                os.remove(temp_path)
+                media_file.seek(0)  # Reset file pointer
+                
+            if file_size > 25 * 1024 * 1024:  # 25MB
+                input_data.append({
+                    'type': 'media',
+                    'filename': filename,
+                    'success': False,
+                    'error': 'Media file too large. Maximum size is 25MB for transcription.'
+                })
+                continue
+            
+            try:
+                print(f"🎬 Transcribing media file: {filename}")
+                
+                # Transcribe the media file
+                transcribed_text = transcriber.transcribe(media_file)
+                
+                if not transcribed_text or len(transcribed_text.strip()) < 10:
+                    input_data.append({
+                        'type': 'media',
+                        'filename': filename,
+                        'success': False,
+                        'error': 'Could not transcribe media file or no speech detected'
+                    })
+                    continue
+                
+                # Determine if it's audio or video for better labeling
+                file_ext = os.path.splitext(filename.lower())[1]
+                video_formats = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v', '.3gp', '.mpeg', '.mpg']
+                media_type = 'video' if file_ext in video_formats else 'audio'
+                
+                input_data.append({
+                    'type': 'media',
+                    'filename': filename,
+                    'media_type': media_type,
+                    'text': transcribed_text,
+                    'success': True
+                })
+                
+                print(f"✅ Successfully transcribed {media_type}: {filename} ({len(transcribed_text)} characters)")
+                
+            except Exception as e:
+                input_data.append({
+                    'type': 'media',
+                    'filename': filename,
+                    'success': False,
+                    'error': f'Error transcribing media: {str(e)}'
+                })
+        
         # Process URLs
         for url in urls:
             try:
@@ -910,7 +987,10 @@ def upload_multiple_files():
                 'error': 'No inputs could be processed'
             })
         
-        print(f"✅ Successfully extracted text from {len(valid_inputs)} inputs ({len([i for i in valid_inputs if i['type'] == 'file'])} files, {len([i for i in valid_inputs if i['type'] == 'url'])} URLs)")
+        file_count = len([i for i in valid_inputs if i['type'] == 'file'])
+        media_count = len([i for i in valid_inputs if i['type'] == 'media']) 
+        url_count = len([i for i in valid_inputs if i['type'] == 'url'])
+        print(f"✅ Successfully extracted text from {len(valid_inputs)} inputs ({file_count} files, {media_count} media files, {url_count} URLs)")
         
         # Phase 2: Generate individual summaries only for single input or as fallback
         if len(valid_inputs) == 1:
@@ -958,8 +1038,12 @@ def upload_multiple_files():
                         # Determine title based on input type
                         if input_entry['type'] == 'file':
                             title = input_entry['filename']
-                        else:  # URL
+                        elif input_entry['type'] == 'url':
                             title = input_entry['title']
+                        elif input_entry['type'] == 'media':
+                            title = input_entry['filename']
+                        else:
+                            title = 'Unknown'
                         
                         # Add document to session
                         document = {
@@ -1044,9 +1128,12 @@ def upload_multiple_files():
                 # Add type-specific fields
                 if input_entry['type'] == 'file':
                     result['filename'] = input_entry['filename']
-                else:  # URL
+                elif input_entry['type'] == 'url':
                     result['url'] = input_entry['url']
                     result['title'] = input_entry['title']
+                elif input_entry['type'] == 'media':
+                    result['filename'] = input_entry['filename']
+                    result['media_type'] = input_entry.get('media_type', 'unknown')
                 
                 results.append(result)
             else:
@@ -1059,8 +1146,10 @@ def upload_multiple_files():
                 # Add type-specific fields for errors
                 if input_entry['type'] == 'file':
                     error_result['filename'] = input_entry['filename']
-                else:  # URL
-                    error_result['url'] = input_entry['url']
+                elif input_entry['type'] == 'url':
+                    error_result['url'] = input_entry.get('url', '')
+                elif input_entry['type'] == 'media':
+                    error_result['filename'] = input_entry.get('filename', '')
                 
                 results.append(error_result)
         
@@ -1076,14 +1165,25 @@ def upload_multiple_files():
                     source_texts.append(input_entry['text'])
                     if input_entry['type'] == 'file':
                         successful_inputs.append(input_entry['filename'])
-                    else:  # URL
+                    elif input_entry['type'] == 'url':
                         successful_inputs.append(input_entry['title'])
+                    elif input_entry['type'] == 'media':
+                        successful_inputs.append(input_entry['filename'])
             
             if source_texts:
                 # Create a unified document from all sources
-                input_types = [f"{len([i for i in valid_inputs if i['type'] == 'file' and i.get('qa_stored', False)])} files" if any(i['type'] == 'file' for i in valid_inputs if i.get('qa_stored', False)) else "",
-                              f"{len([i for i in valid_inputs if i['type'] == 'url' and i.get('qa_stored', False)])} URLs" if any(i['type'] == 'url' for i in valid_inputs if i.get('qa_stored', False)) else ""]
-                input_types_str = " and ".join([t for t in input_types if t])
+                input_types = []
+                file_count = len([i for i in valid_inputs if i['type'] == 'file' and i.get('qa_stored', False)])
+                media_count = len([i for i in valid_inputs if i['type'] == 'media' and i.get('qa_stored', False)])
+                url_count = len([i for i in valid_inputs if i['type'] == 'url' and i.get('qa_stored', False)])
+                
+                if file_count > 0:
+                    input_types.append(f"{file_count} files")
+                if media_count > 0:
+                    input_types.append(f"{media_count} media files")
+                if url_count > 0:
+                    input_types.append(f"{url_count} URLs")
+                input_types_str = " and ".join(input_types)
                 
                 unified_text = f"Combined analysis of {len(successful_inputs)} inputs ({input_types_str}): {', '.join(successful_inputs)}\n\n"
                 
@@ -1103,7 +1203,14 @@ def upload_multiple_files():
                     individual_summaries = []
                     for input_entry in valid_inputs:
                         if input_entry.get('qa_stored', False):
-                            input_name = input_entry['filename'] if input_entry['type'] == 'file' else input_entry['title']
+                            if input_entry['type'] == 'file':
+                                input_name = input_entry['filename']
+                            elif input_entry['type'] == 'url':
+                                input_name = input_entry['title']
+                            elif input_entry['type'] == 'media':
+                                input_name = input_entry['filename']
+                            else:
+                                input_name = 'Unknown'
                             try:
                                 summary = summarizer.summarize(input_entry['text'], detail_level=summary_level)
                                 individual_summaries.append(f"**{input_name}**: {summary}")
@@ -1128,6 +1235,7 @@ def upload_multiple_files():
             'successful_uploads': successful_uploads,
             'total_inputs': len(input_data),
             'total_files': len([f for f in input_data if f.get('type') == 'file']),
+            'total_media': len([f for f in input_data if f.get('type') == 'media']),
             'total_urls': len([f for f in input_data if f.get('type') == 'url']),
             'combined_summary': combined_summary,
             'audio_url': None,  # Will be generated separately

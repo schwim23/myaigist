@@ -6,22 +6,29 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**MyAIGist** is an intelligent AI-powered assistant that transforms any content into an interactive Q&A experience using **real semantic search with OpenAI embeddings**. Upload documents, paste text, **or add website URLs** to get unified summaries with progressive UI updates. Ask questions using text or voice with responsive audio feedback.
+**MyAIGist** is an intelligent AI-powered assistant that transforms any content into an interactive Q&A experience using **real semantic search with OpenAI embeddings**. Upload documents, paste text, add website URLs, **or transcribe audio/video files** to get unified summaries with progressive UI updates. Ask questions using text or voice with responsive audio feedback.
 
 ![MyAIGist Demo](https://via.placeholder.com/800x400/667eea/ffffff?text=MyAIGist+Demo+Screenshot)
 
 ---
 
-## ✨ Latest Features (v3.0)
+## ✨ Latest Features (v3.1)
 
-### 🌐 **Website URL Crawling & Analysis** ⭐ NEW IN V3.0
+### 🎬 **Audio/Video Transcription Support** ⭐ NEW IN V3.1
+- **Media File Upload**: Support for 19+ audio and video formats (.mp3, .wav, .mp4, .mov, .avi, etc.)
+- **OpenAI Whisper Integration**: Automatic transcription of speech from audio and video files
+- **Format Auto-Conversion**: Unsupported formats (.mov, .avi) automatically converted to compatible formats via ffmpeg
+- **Mixed Media Support**: Combine audio/video files with documents, text, and URLs (up to 5 total inputs)
+- **Smart Error Handling**: Clear error messages for transcription failures and format issues
+
+### 🌐 **Website URL Crawling & Analysis** ⭐ IN V3.0
 - **Smart Web Scraping**: Automatically extract and analyze content from any website URL
 - **Wikipedia Integration**: Optimized extraction for Wikipedia articles and educational content  
 - **Mixed Input Support**: Combine files, text, and URLs in single analysis (up to 5 total inputs)
 - **Intelligent Content Filtering**: Clean extraction removing navigation, ads, and irrelevant content
 
 ### 🚀 **Multi-Input Processing & Unified Summaries**
-- **Mixed Content Batch**: Process documents, text entries, and website URLs simultaneously
+- **Mixed Content Batch**: Process documents, text entries, audio/video files, and website URLs simultaneously
 - **Unified Summarization**: AI synthesizes content across ALL inputs into single coherent summary
 - **Batch Embeddings**: Optimized performance with 75% faster processing via batch API calls
 - **Progressive UI**: Summaries appear instantly, audio loads in background for responsive experience
@@ -35,9 +42,10 @@
 ### 📄 **Enhanced Content Processing**
 - **Text Input**: Direct text analysis and processing
 - **Website URLs**: Automatic content extraction from any web page
-- **Multi-Document Upload**: PDF, DOCX, TXT with intelligent parsing
+- **Document Upload**: PDF, DOCX, TXT with intelligent parsing
+- **Audio/Video Files**: 19+ formats with automatic transcription via OpenAI Whisper
 - **Mixed Input System**: Unified interface supporting all content types with 5-item limit
-- **Smart File Validation**: Client and server-side validation with size limits
+- **Smart File Validation**: Client and server-side validation with size limits (25MB for media files)
 
 ### 🎯 **Three-Level AI Summaries**
 - **⚡ Quick**: 2-3 key bullet points (300 tokens) for fast overview
@@ -50,9 +58,11 @@
 - **Text & Voice**: Type questions or use microphone recording
 - **Audio Responses**: Progressive audio generation with multiple voice options
 
-### 🔊 **Voice Features**
+### 🔊 **Voice & Media Features**
 - **Live Recording**: Browser-based microphone with real-time feedback
-- **Auto-Transcription**: Whisper model converts speech to text
+- **Audio/Video Upload**: Direct file upload with automatic transcription
+- **Auto-Transcription**: OpenAI Whisper converts speech/media to text
+- **Format Support**: MP3, WAV, MP4, MOV, AVI, FLAC, M4A, AAC, OGG, WMA, WEBM, MKV, and more
 - **Progressive Audio**: Text-to-speech loads in background for better UX
 - **Multiple Voices**: Choose from 6 different AI voices (Nova, Alloy, Echo, Fable, Onyx, Shimmer)
 
@@ -138,11 +148,11 @@ docker run -p 8000:8000 --env-file .env myaigist
 
 ### **AI Agent System**
 - **DocumentProcessor**: Extracts text from PDF, DOCX, TXT files
-- **UrlCrawler**: Web scraping and content extraction from any website ⭐ NEW
+- **UrlCrawler**: Web scraping and content extraction from any website
+- **Transcriber**: Audio/video transcription (Whisper) with format conversion and text-to-speech ⭐ ENHANCED
 - **Summarizer**: Multi-level AI summarization with configurable models
 - **VectorStore**: Semantic embeddings with persistence for containers
 - **Embedder**: OpenAI embedding generation with batch support
-- **Transcriber**: Audio transcription (Whisper) and text-to-speech
 - **QAAgent**: RAG-powered Q&A with semantic similarity search
 
 ### **Tech Stack**
@@ -173,11 +183,11 @@ myaigist/
 ├── agents/                   # AI agent modules
 │   ├── openai_client.py     # Centralized OpenAI client
 │   ├── document_processor.py # Document text extraction
-│   ├── url_crawler.py       # Website content extraction ⭐ NEW
+│   ├── url_crawler.py       # Website content extraction
+│   ├── transcriber.py       # Audio/video processing with format conversion ⭐ ENHANCED
 │   ├── summarizer.py        # Multi-level summarization
 │   ├── embeddings.py        # OpenAI embedding generation
 │   ├── vector_store.py      # Container-friendly vector storage
-│   ├── transcriber.py       # Audio processing (Whisper/TTS)
 │   ├── tts.py               # Text-to-speech agent
 │   └── qa_agent.py          # Semantic RAG Q&A system
 ├── data/                     # Persistent vector storage
@@ -310,29 +320,30 @@ gtag('event', 'question_asked', {
 
 ## 🎯 Usage Examples
 
-### 1. **Mixed Content Analysis with Website URLs** ⭐ NEW
+### 1. **Mixed Content Analysis with Audio/Video + Web URLs** ⭐ NEW
 ```bash
-1. Add website URL: https://en.wikipedia.org/wiki/Machine_Learning
-2. Upload a research paper (PDF) and add some notes (text input)
-3. Select "Detailed" summary level for comprehensive analysis
-4. Get single unified summary combining web article + document + notes
-5. Ask: "How does the Wikipedia article relate to the research findings?"
-6. Get precise answers from semantically relevant sections across ALL sources
+1. Upload an audio file (e.g., recorded lecture or interview)
+2. Add website URL: https://en.wikipedia.org/wiki/Machine_Learning
+3. Upload a research paper (PDF) and add some notes (text input)
+4. Select "Detailed" summary level for comprehensive analysis
+5. Get single unified summary combining transcribed audio + web article + document + notes
+6. Ask: "How do the spoken insights relate to the research and Wikipedia content?"
+7. Get precise answers from semantically relevant sections across ALL sources
 ```
 
-### 2. **Multi-Document Analysis with Unified Summaries**
+### 2. **Audio/Video Content Analysis**
 ```bash
-1. Upload multiple documents (up to 5 files: PDF, DOCX, TXT)
-2. Add website URLs for additional context
-3. Select "Detailed" summary level for comprehensive analysis
-4. Get single unified summary synthesizing ALL inputs together
-5. Ask: "What are the common themes across these sources?"
-6. Get precise answers from semantically relevant sections
+1. Upload video files (.mp4, .mov, .avi) or audio files (.mp3, .wav, .flac)
+2. Automatic transcription extracts speech content via OpenAI Whisper
+3. Unsupported formats (.mov, .avi) automatically converted to compatible formats
+4. Add additional context with documents or URLs
+5. Ask: "What were the key points mentioned in the video?"
+6. Get answers based on transcribed speech content with exact quotes
 ```
 
 ### 3. **Progressive Voice-Powered Q&A**
 ```bash
-1. Upload documents, paste text, or add URLs - summary appears instantly
+1. Upload documents, audio/video files, paste text, or add URLs - summary appears instantly
 2. Audio generates in background for responsive experience
 3. Click microphone and ask: "What are the key implications?"
 4. Get both text and audio response with progressive loading
@@ -377,12 +388,13 @@ Response:
 }
 ```
 
-### **Upload Multiple Inputs - Files & URLs** ⭐ UPDATED IN V3.0
+### **Upload Multiple Inputs - Files, Media & URLs** ⭐ UPDATED IN V3.1
 ```http
 POST /api/upload-multiple-files
 Content-Type: multipart/form-data
 
-files: [file1.pdf, file2.docx]                    // Files (optional)
+files: [file1.pdf, file2.docx]                    // Documents (optional)
+media_files: [audio.mp3, video.mov]               // Audio/Video files (optional) ⭐ NEW
 urls: ["https://en.wikipedia.org/wiki/AI", "https://example.com/article"]  // URLs (optional)
 summary_level: "standard"                         // Up to 5 total inputs
 voice: "nova"
@@ -400,6 +412,14 @@ Response:
       "qa_stored": true
     },
     {
+      "filename": "audio.mp3",
+      "type": "media",
+      "media_type": "audio",
+      "success": true,
+      "text_length": 1200,
+      "qa_stored": true
+    },
+    {
       "title": "Artificial intelligence - Wikipedia",
       "type": "url",
       "url": "https://en.wikipedia.org/wiki/AI",
@@ -408,10 +428,11 @@ Response:
       "qa_stored": true
     }
   ],
-  "successful_uploads": 4,
-  "total_files": 2,
-  "total_urls": 2,
-  "combined_summary": "Unified analysis of 4 inputs (2 files and 2 URLs): ...",  // Single coherent summary
+  "successful_uploads": 3,
+  "total_files": 1,
+  "total_media": 1,
+  "total_urls": 1,
+  "combined_summary": "Unified analysis of 3 inputs (1 files, 1 media files and 1 URLs): ...",  // Single coherent summary
   "audio_url": null,  // Generated via separate endpoint
   "voice": "nova"
 }
@@ -575,34 +596,40 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🚀 Roadmap
 
-### **Current Version: v3.0** ✅
+### **Current Version: v3.1** ✅
+- ✅ **Audio/Video Transcription**: 19+ media formats with OpenAI Whisper integration
+- ✅ **Format Auto-Conversion**: Automatic conversion of unsupported formats via ffmpeg
+- ✅ **Mixed Media Processing**: Audio/video files combined with documents, text, and URLs
 - ✅ **Website URL Crawling**: Smart web scraping with content extraction
-- ✅ **Mixed Input Processing**: Files, text, and URLs in unified system
+- ✅ **Mixed Input Processing**: Files, media, text, and URLs in unified system
 - ✅ **Wikipedia Optimization**: Enhanced extraction for educational content
 - ✅ Real semantic search with OpenAI embeddings
 - ✅ Multi-input upload with unified summarization (up to 5 total)
 - ✅ Batch embedding processing for 75% faster performance
 - ✅ Progressive UI with instant summary display
 - ✅ Background audio generation for responsive experience
+- ✅ Enhanced error handling with specific failure messages
 - ✅ Terms of Service with legal protection
 - ✅ Container-ready vector storage with persistence
 - ✅ Docker version tracking with Git commit SHAs
 - ✅ Google Analytics integration with comprehensive event tracking
 - ✅ AWS Fargate optimization with extended timeouts
 
-### **Upcoming Features: v3.1** 🔄
+### **Upcoming Features: v3.2** 🔄
 - 🔄 Streaming responses for real-time text generation
-- 🔄 Enhanced cross-referencing between URLs and documents
+- 🔄 Enhanced cross-referencing between media transcripts and documents
 - 🔄 Advanced analytics dashboard with usage metrics
 - 🔄 API rate limiting and authentication
 - 🔄 File format expansion (PowerPoint, Excel, etc.)
+- 🔄 Batch media processing for large video files
 
 ### **Future Enhancements: v4.0** 🔮
 - 🤖 Custom embedding models and fine-tuning
 - ☁️ S3/MinIO integration for large file storage
 - 🔒 Enterprise SSO and user management
 - 📱 Progressive Web App (PWA) support
-- 🌐 Multi-language document processing
+- 🌐 Multi-language document and media processing
+- 🎬 Advanced video analysis with scene detection
 - 🔗 Advanced URL validation and site-specific extractors
 
 ---
