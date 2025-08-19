@@ -10,6 +10,11 @@ class MyAIGist {
         this.selectedVoice = 'nova'; // Default voice
         this.selectedInputs = []; // Unified input system (text and files)
         this.userDocuments = []; // Track user's uploaded documents
+        
+        // Analytics counters
+        this.questionsAsked = 0;
+        this.summariesGenerated = 0;
+        this.isVoiceTranscribed = false; // Track if current question was voice transcribed
 
         // Bind methods (extra safety against "not a function" if something rebinds context)
         this.processContent = this.processContent.bind(this);
@@ -22,6 +27,22 @@ class MyAIGist {
 
     init() {
         console.log('🚀 Initializing MyAIGist...');
+        
+        // Track application initialization
+        this.trackEvent('app_initialized', {
+            user_agent: navigator.userAgent,
+            screen_resolution: `${screen.width}x${screen.height}`,
+            viewport_size: `${window.innerWidth}x${window.innerHeight}`,
+            language: navigator.language,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            device_memory: navigator.deviceMemory || 'unknown',
+            connection_type: navigator.connection?.effectiveType || 'unknown',
+            has_localStorage: typeof(Storage) !== 'undefined',
+            has_webAudio: !!(window.AudioContext || window.webkitAudioContext),
+            has_mediaRecorder: !!window.MediaRecorder,
+            has_getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+        });
+
         this.setupEventListeners();
         this.setupTabs();
         this.setupSummaryLevels();
@@ -30,17 +51,102 @@ class MyAIGist {
         this.setupMultiFileUpload();
         this.loadUserDocuments();
 
+        // Track engagement timing
+        this.startTime = Date.now();
+        this.setupEngagementTracking();
+
         // Debug: list methods to ensure processContent exists
         const protoMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this));
         console.log('🧩 Methods on instance:', protoMethods);
     }
 
-    // Google Analytics event tracking helper
+    setupEngagementTracking() {
+        // Track user engagement patterns
+        let engagementStartTime = Date.now();
+        let isActive = true;
+        
+        // Track page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.trackUserEngagement('page_hidden', {
+                    time_active: Date.now() - engagementStartTime
+                });
+                isActive = false;
+            } else {
+                engagementStartTime = Date.now();
+                isActive = true;
+                this.trackUserEngagement('page_visible');
+            }
+        });
+
+        // Track user inactivity
+        let inactivityTimer;
+        const resetInactivityTimer = () => {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                if (isActive) {
+                    this.trackUserEngagement('user_inactive', {
+                        inactive_duration: 30000 // 30 seconds
+                    });
+                }
+            }, 30000);
+        };
+
+        // Reset timer on user interactions
+        ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+            document.addEventListener(event, resetInactivityTimer, true);
+        });
+
+        // Track page unload
+        window.addEventListener('beforeunload', () => {
+            this.trackEvent('session_ended', {
+                session_duration: Date.now() - this.startTime,
+                total_questions_asked: this.questionsAsked || 0,
+                total_summaries_generated: this.summariesGenerated || 0
+            });
+        });
+    }
+
+    // Google Analytics event tracking helper with enhanced parameters
     trackEvent(eventName, parameters = {}) {
         if (typeof window.gtag === 'function') {
-            window.gtag('event', eventName, parameters);
-            console.log('📊 GA Event tracked:', eventName, parameters);
+            // Add common parameters to all events
+            const enhancedParams = {
+                ...parameters,
+                timestamp: new Date().toISOString(),
+                page_location: window.location.href,
+                user_agent: navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop'
+            };
+            
+            window.gtag('event', eventName, enhancedParams);
+            console.log('📊 GA Event tracked:', eventName, enhancedParams);
         }
+    }
+
+    // Track page interactions and user engagement
+    trackUserEngagement(action, details = {}) {
+        this.trackEvent('user_engagement', {
+            engagement_type: action,
+            ...details
+        });
+    }
+
+    // Track feature usage with detailed parameters
+    trackFeatureUsage(feature, action, details = {}) {
+        this.trackEvent('feature_usage', {
+            feature_name: feature,
+            action: action,
+            ...details
+        });
+    }
+
+    // Track errors and issues
+    trackError(errorType, errorMessage, context = {}) {
+        this.trackEvent('app_error', {
+            error_type: errorType,
+            error_message: errorMessage,
+            error_context: JSON.stringify(context)
+        });
     }
 
     setupEventListeners() {
@@ -209,6 +315,13 @@ class MyAIGist {
 
     async startRecording() {
         console.log('▶️ Starting recording...');
+        this.recordingStartTime = Date.now();
+        
+        // Track recording initiation
+        this.trackFeatureUsage('voice_recording', 'started', {
+            device_type: navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop'
+        });
+        
         try {
             this.hidePlaybackSection();
 
@@ -286,6 +399,13 @@ class MyAIGist {
         this.isRecording = false;
         this.updateMicButton();
         this.hideRecordingStatus();
+        
+        // Track recording completion
+        const recordingDuration = this.recordingStartTime ? Date.now() - this.recordingStartTime : 0;
+        this.trackFeatureUsage('voice_recording', 'stopped', {
+            recording_duration: recordingDuration,
+            recording_length_category: recordingDuration < 10000 ? 'short' : recordingDuration < 30000 ? 'medium' : 'long'
+        });
         this.stopTimer();
     }
 
@@ -399,10 +519,12 @@ class MyAIGist {
     async transcribeRecording() {
         if (!this.currentRecordingBlob) {
             this.showStatus('No recording available to transcribe', 'error');
+            this.trackError('voice_transcription_error', 'No recording available');
             return;
         }
 
         console.log('📝 Starting transcription...');
+        const transcriptionStartTime = Date.now();
 
         try {
             this.showStatus('Transcribing your question...', 'loading');
@@ -434,6 +556,21 @@ class MyAIGist {
                 this.hidePlaybackSection();
                 this.showStatus('✅ Question transcribed! You can edit it or ask directly.', 'success');
                 console.log('✅ Transcription successful:', result.text);
+                
+                // Mark that this question was voice transcribed for later analytics
+                this.isVoiceTranscribed = true;
+                
+                // Track successful transcription
+                this.trackEvent('voice_transcribed', {
+                    transcription_duration: Date.now() - transcriptionStartTime,
+                    transcribed_text_length: result.text.length,
+                    recording_size_bytes: this.currentRecordingBlob.size,
+                    transcription_quality: result.text.length > 20 ? 'good' : 'short'
+                });
+                
+                this.trackFeatureUsage('voice_transcription', 'success', {
+                    text_length: result.text.length
+                });
             } else {
                 throw new Error(result.error || 'Transcription failed');
             }
@@ -441,6 +578,12 @@ class MyAIGist {
         } catch (error) {
             console.error('❌ Transcription error:', error);
             this.showStatus('Transcription failed: ' + error.message, 'error');
+            
+            // Track transcription errors
+            this.trackError('voice_transcription_error', error.message, {
+                transcription_duration: Date.now() - transcriptionStartTime,
+                recording_size_bytes: this.currentRecordingBlob ? this.currentRecordingBlob.size : 0
+            });
         }
     }
 
@@ -449,8 +592,27 @@ class MyAIGist {
         // Check if we have inputs
         if (!this.selectedInputs?.length) {
             this.showStatus('❌ Please add some content to analyze', 'error');
+            this.trackError('validation_error', 'No content provided for processing');
             return;
         }
+
+        // Track content processing initiation
+        const startTime = Date.now();
+        const textInputs = this.selectedInputs.filter(input => input.type === 'text');
+        const fileInputs = this.selectedInputs.filter(input => input.type === 'file');
+        const mediaInputs = this.selectedInputs.filter(input => input.type === 'media');
+        const urlInputs = this.selectedInputs.filter(input => input.type === 'url');
+
+        this.trackFeatureUsage('content_processing', 'started', {
+            total_inputs: this.selectedInputs.length,
+            text_inputs: textInputs.length,
+            file_inputs: fileInputs.length,
+            media_inputs: mediaInputs.length,
+            url_inputs: urlInputs.length,
+            summary_level: this.selectedSummaryLevel,
+            voice_selected: this.selectedVoice,
+            processing_type: this.selectedInputs.length > 1 || fileInputs.length > 0 || mediaInputs.length > 0 || urlInputs.length > 0 ? 'multi_input' : 'single_text'
+        });
 
         const processBtn = document.getElementById('process-btn');
         if (processBtn) {
@@ -459,12 +621,6 @@ class MyAIGist {
         }
 
         try {
-            // Separate text, file, media, and URL inputs
-            const textInputs = this.selectedInputs.filter(input => input.type === 'text');
-            const fileInputs = this.selectedInputs.filter(input => input.type === 'file');
-            const mediaInputs = this.selectedInputs.filter(input => input.type === 'media');
-            const urlInputs = this.selectedInputs.filter(input => input.type === 'url');
-
             // If we have multiple inputs or any files or media or URLs, use multi-input processing
             if (this.selectedInputs.length > 1 || fileInputs.length > 0 || mediaInputs.length > 0 || urlInputs.length > 0) {
                 return await this.processMultipleInputs();
@@ -485,11 +641,23 @@ class MyAIGist {
         } catch (error) {
             console.error('❌ Process content error:', error);
             this.showStatus(error.message, 'error');
+            
+            // Track processing error
+            this.trackError('content_processing_error', error.message, {
+                total_inputs: this.selectedInputs.length,
+                summary_level: this.selectedSummaryLevel,
+                processing_duration: Date.now() - startTime
+            });
         } finally {
             if (processBtn) {
                 processBtn.disabled = false;
                 processBtn.innerHTML = '🚀 Analyze Content';
             }
+            
+            // Track processing completion
+            this.trackFeatureUsage('content_processing', 'completed', {
+                processing_duration: Date.now() - startTime
+            });
         }
     }
 
@@ -521,6 +689,20 @@ class MyAIGist {
         const result = await response.json();
 
         if (result.success) {
+            // Increment counter
+            this.summariesGenerated++;
+            
+            // Track successful summary generation
+            this.trackEvent('content_summarized', {
+                content_type: 'single_text',
+                summary_level: this.selectedSummaryLevel,
+                text_length: requestData.text ? requestData.text.length : 0,
+                summary_length: result.summary ? result.summary.length : 0,
+                has_qa_stored: result.qa_stored || false,
+                embedding_stats: result.embedding_stats || null,
+                summary_number: this.summariesGenerated
+            });
+
             // Phase 1: Show summary immediately
             this.showSummary(result.summary, null, this.selectedSummaryLevel);
             this.showQASection();
@@ -619,14 +801,31 @@ class MyAIGist {
             this.showQASection();
             await this.loadUserDocuments();
 
-            // Track event
-            this.trackEvent('multi_input_processed', {
+            // Increment counter
+            this.summariesGenerated++;
+            
+            // Track detailed multi-input success
+            this.trackEvent('multi_content_summarized', {
                 total_inputs: this.selectedInputs.length,
                 text_inputs: textInputs.length,
                 file_inputs: fileInputs.length,
                 media_inputs: mediaInputs.length,
                 url_inputs: urlInputs.length,
-                summary_level: this.selectedSummaryLevel
+                summary_level: this.selectedSummaryLevel,
+                successful_uploads: data.successful_uploads || 0,
+                total_files: data.total_files || 0,
+                total_media: data.total_media || 0,
+                total_urls: data.total_urls || 0,
+                combined_summary_length: summaryText.length,
+                has_failures: data.results ? data.results.some(r => !r.success) : false,
+                summary_number: this.summariesGenerated,
+                processing_details: data.results ? {
+                    successful_items: data.results.filter(r => r.success).length,
+                    failed_items: data.results.filter(r => !r.success).length,
+                    file_types: data.results.filter(r => r.type === 'file' && r.success).map(r => r.filename?.split('.').pop()).filter(Boolean),
+                    media_types: data.results.filter(r => r.type === 'media' && r.success).map(r => r.media_type).filter(Boolean),
+                    avg_text_length: data.results.filter(r => r.success && r.text_length).reduce((sum, r) => sum + r.text_length, 0) / Math.max(1, data.results.filter(r => r.success && r.text_length).length)
+                } : null
             });
             
             this.showStatus(`Successfully analyzed ${this.selectedInputs.length} input(s)!`, 'success');
@@ -683,6 +882,7 @@ class MyAIGist {
     async askQuestion() {
         const questionText = document.getElementById('question-text')?.value?.trim() || '';
         const askBtn = document.getElementById('ask-btn');
+        const startTime = Date.now();
 
         console.log('🔍 =========================');
         console.log('🔍 DEBUG: askQuestion called');
@@ -692,8 +892,16 @@ class MyAIGist {
 
         if (!questionText) {
             this.showStatus('Please enter a question or record one using the microphone', 'error');
+            this.trackError('validation_error', 'No question provided for Q&A');
             return;
         }
+
+        // Track Q&A initiation
+        this.trackFeatureUsage('qa_system', 'question_started', {
+            question_length: questionText.length,
+            question_type: this.isVoiceTranscribed ? 'voice' : 'text',
+            has_context: this.userDocuments.length > 0
+        });
 
         if (askBtn) {
             askBtn.disabled = true;
@@ -725,14 +933,32 @@ class MyAIGist {
             if (result.success && result.answer) {
                 this.showAnswer(result.answer, result.audio_url);
                 
-                // Track question asking event
-                this.trackEvent('question_asked', {
+                // Increment counter
+                this.questionsAsked++;
+                
+                // Track detailed Q&A success
+                this.trackEvent('question_answered', {
                     question_length: questionText.length,
-                    has_audio_response: !!result.audio_url
+                    answer_length: result.answer.length,
+                    has_audio_response: !!result.audio_url,
+                    question_type: this.isVoiceTranscribed ? 'voice' : 'text',
+                    response_time: Date.now() - startTime,
+                    context_documents: this.userDocuments.length,
+                    sources_found: result.sources ? result.sources.length : 0,
+                    similarity_scores: result.sources ? result.sources.map(s => s.similarity) : [],
+                    question_number: this.questionsAsked
                 });
+
+                // Track Q&A feature usage
+                this.trackFeatureUsage('qa_system', 'answer_generated', {
+                    response_time: Date.now() - startTime,
+                    answer_quality: result.answer.length > 50 ? 'detailed' : 'brief'
+                });
+
                 const q = document.getElementById('question-text');
                 if (q) q.value = '';
                 this.showStatus('✅ Question answered successfully!', 'success');
+                this.isVoiceTranscribed = false; // Reset voice flag
             } else {
                 throw new Error(result.error || 'No answer received');
             }
@@ -740,11 +966,25 @@ class MyAIGist {
         } catch (error) {
             console.error('❌ COMPLETE ERROR DETAILS:', error);
             this.showStatus(`❌ ${error.message}`, 'error');
+            
+            // Track Q&A errors
+            this.trackError('qa_error', error.message, {
+                question_length: questionText.length,
+                question_type: this.isVoiceTranscribed ? 'voice' : 'text',
+                response_time: Date.now() - startTime,
+                context_documents: this.userDocuments.length
+            });
         } finally {
             if (askBtn) {
                 askBtn.disabled = false;
                 askBtn.innerHTML = 'Ask Question';
             }
+            
+            // Track Q&A completion
+            this.trackFeatureUsage('qa_system', 'completed', {
+                total_time: Date.now() - startTime
+            });
+            
             console.log('🔍 ========================= END DEBUG =========================');
         }
     }
@@ -1478,6 +1718,15 @@ class MyAIGist {
     }
 
     addTextInput(text) {
+        // Track text input analytics
+        this.trackFeatureUsage('text_input', 'added', {
+            text_length: text.length,
+            word_count: text.split(/\s+/).filter(word => word.length > 0).length,
+            character_count: text.length,
+            current_input_count: this.selectedInputs.length,
+            text_complexity: text.length > 500 ? 'long' : text.length > 100 ? 'medium' : 'short'
+        });
+
         const textInput = {
             id: `text_${Date.now()}`,
             type: 'text',
@@ -1502,6 +1751,21 @@ class MyAIGist {
     }
 
     addUrlInput(url) {
+        // Track URL input analytics
+        this.trackFeatureUsage('url_input', 'added', {
+            url_length: url.length,
+            domain: this.getDomainFromUrl(url),
+            url_type: url.includes('youtube.') ? 'video' : 
+                     url.includes('wikipedia.') ? 'encyclopedia' :
+                     url.includes('github.') ? 'repository' :
+                     url.includes('stackoverflow.') ? 'qa_site' :
+                     url.includes('reddit.') ? 'social' : 'general',
+            is_https: url.startsWith('https://'),
+            current_input_count: this.selectedInputs.length,
+            has_path: new URL(url).pathname !== '/',
+            has_query: new URL(url).search !== ''
+        });
+
         const urlInput = {
             id: `url_${Date.now()}`,
             type: 'url',
@@ -1531,8 +1795,25 @@ class MyAIGist {
         const remainingSlots = 5 - this.selectedInputs.length;
         if (files.length > remainingSlots) {
             this.showStatus(`❌ Can only add ${remainingSlots} more item(s). Maximum 5 inputs allowed.`, 'error');
+            this.trackError('file_selection_error', 'Maximum inputs exceeded', {
+                attempted_files: files.length,
+                remaining_slots: remainingSlots
+            });
             return;
         }
+
+        // Track file selection analytics
+        const fileTypes = files.map(f => f.name.split('.').pop().toLowerCase()).filter(Boolean);
+        const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+        
+        this.trackFeatureUsage('file_upload', 'selected', {
+            file_count: files.length,
+            file_types: fileTypes,
+            total_size_bytes: totalSize,
+            avg_size_bytes: totalSize / files.length,
+            largest_file_bytes: Math.max(...files.map(f => f.size)),
+            current_input_count: this.selectedInputs.length
+        });
 
         files.forEach(file => {
             const fileInput = {
@@ -1557,8 +1838,32 @@ class MyAIGist {
         const remainingSlots = 5 - this.selectedInputs.length;
         if (files.length > remainingSlots) {
             this.showStatus(`❌ Can only add ${remainingSlots} more item(s). Maximum 5 inputs allowed.`, 'error');
+            this.trackError('media_selection_error', 'Maximum inputs exceeded', {
+                attempted_files: files.length,
+                remaining_slots: remainingSlots
+            });
             return;
         }
+
+        // Track media selection analytics
+        const fileTypes = files.map(f => f.name.split('.').pop().toLowerCase()).filter(Boolean);
+        const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+        const mediaTypes = fileTypes.map(type => {
+            const audioFormats = ['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'wma', 'mpga'];
+            return audioFormats.includes(type) ? 'audio' : 'video';
+        });
+        
+        this.trackFeatureUsage('media_upload', 'selected', {
+            file_count: files.length,
+            file_types: fileTypes,
+            media_types: mediaTypes,
+            audio_files: mediaTypes.filter(t => t === 'audio').length,
+            video_files: mediaTypes.filter(t => t === 'video').length,
+            total_size_bytes: totalSize,
+            avg_size_mb: (totalSize / files.length) / (1024 * 1024),
+            over_25mb_limit: files.some(f => f.size > 25 * 1024 * 1024),
+            current_input_count: this.selectedInputs.length
+        });
 
         // Define supported media formats
         const audioFormats = ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma', '.mpga'];
