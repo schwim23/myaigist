@@ -1,0 +1,239 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "ContentProcessed", "ContentType", "text", { "stat": "Sum" } ],
+          [ ".", ".", ".", "file", { "stat": "Sum" } ],
+          [ ".", ".", ".", "url", { "stat": "Sum" } ],
+          [ ".", ".", ".", "media", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "Content Processed by Type",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "QuestionsAsked", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "Questions Asked Over Time",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 6,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "ContentProcessed", "SummaryLevel", "quick", { "stat": "Sum" } ],
+          [ ".", ".", ".", "standard", { "stat": "Sum" } ],
+          [ ".", ".", ".", "detailed", { "stat": "Sum" } ]
+        ],
+        "view": "pie",
+        "region": "us-east-1",
+        "title": "Summary Level Distribution",
+        "period": 3600
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 6,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "MediaTranscribed", "MediaType", "audio", { "stat": "Sum" } ],
+          [ ".", ".", ".", "video", { "stat": "Sum" } ]
+        ],
+        "view": "pie",
+        "region": "us-east-1",
+        "title": "Media Type Distribution",
+        "period": 3600
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 6,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "VoiceFeatureUsed", "FeatureType", "recording", { "stat": "Sum" } ],
+          [ ".", ".", ".", "tts", { "stat": "Sum" } ]
+        ],
+        "view": "pie",
+        "region": "us-east-1",
+        "title": "Voice Feature Usage",
+        "period": 3600
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "ProcessingTime", "ContentType", "text", { "stat": "Average" } ],
+          [ ".", ".", ".", "file", { "stat": "Average" } ],
+          [ ".", ".", ".", "url", { "stat": "Average" } ],
+          [ ".", ".", ".", "media", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "Average Processing Time by Content Type",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "label": "Seconds"
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "QuestionResponseTime", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "Average Q&A Response Time",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "label": "Seconds"
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 18,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "BatchProcessed", { "stat": "Sum" } ]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "Total Batch Operations",
+        "period": 86400
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 18,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "EmbeddingOperations", { "stat": "Sum" } ]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "Total Embedding Operations",
+        "period": 86400
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 18,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "ApplicationErrors", { "stat": "Sum" } ]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "Application Errors (24h)",
+        "period": 86400
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 24,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "QuestionLength", "LengthCategory", "Short", { "stat": "Sum" } ],
+          [ ".", ".", ".", "Medium", { "stat": "Sum" } ],
+          [ ".", ".", ".", "Long", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": true,
+        "region": "us-east-1",
+        "title": "Question Length Distribution Over Time",
+        "period": 3600
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 24,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "MyAIGist/UserBehavior", "SessionActivity", "ActivityType", "start", { "stat": "Sum" } ],
+          [ ".", ".", ".", "content_upload", { "stat": "Sum" } ],
+          [ ".", ".", ".", "question", { "stat": "Sum" } ],
+          [ ".", ".", ".", "end", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "Session Activity Patterns",
+        "period": 900
+      }
+    }
+  ]
+}

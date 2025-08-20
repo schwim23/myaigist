@@ -21,3 +21,6 @@ urllib3>=1.26.0
 
 # Production Server
 gunicorn>=20.0.0
+
+# AWS CloudWatch Integration
+boto3>=1.26.0

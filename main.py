@@ -17,10 +17,22 @@ try:
     from agents.transcriber import Transcriber
     from agents.qa_agent import QAAgent
     from agents.url_crawler import url_crawler
+    from monitoring.cloudwatch_metrics import metrics_service
     print("✅ Successfully imported all agent modules")
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Please ensure all agent modules exist in the 'agents' directory")
+    # Create dummy metrics service if import fails
+    class DummyMetrics:
+        def track_content_processed(self, *args, **kwargs): pass
+        def track_question_asked(self, *args, **kwargs): pass
+        def track_media_transcription(self, *args, **kwargs): pass
+        def track_voice_usage(self, *args, **kwargs): pass
+        def track_batch_processing(self, *args, **kwargs): pass
+        def track_embedding_operations(self, *args, **kwargs): pass
+        def track_error(self, *args, **kwargs): pass
+        def track_session_activity(self, *args, **kwargs): pass
+    metrics_service = DummyMetrics()
 
 # Create Flask app with explicit static folder configuration
 app = Flask(__name__, 
@@ -279,6 +291,7 @@ def static_files(filename):
 def process_content():
     """Process uploaded content and return summary - TEXT AND DOCUMENTS ONLY"""
     print(f"🔄 Processing content request: {request.content_type}")
+    start_time = datetime.now()
     
     # Check if summarizer is available
     if not summarizer:
@@ -348,6 +361,10 @@ def process_content():
                         print(f"❌ QA storage failed: {e}")
                         import traceback
                         traceback.print_exc()
+                
+                # Track CloudWatch metrics for text processing
+                processing_time = (datetime.now() - start_time).total_seconds()
+                metrics_service.track_content_processed('text', summary_level, processing_time, True)
                 
                 return jsonify({
                     'summary': summary,
@@ -436,6 +453,10 @@ def process_content():
                         import traceback
                         traceback.print_exc()
                 
+                # Track CloudWatch metrics for file processing
+                processing_time = (datetime.now() - start_time).total_seconds()
+                metrics_service.track_content_processed('file', summary_level, processing_time, True)
+                
                 return jsonify({
                     'summary': summary,
                     'audio_url': audio_url,
@@ -453,6 +474,10 @@ def process_content():
         print(f"❌ Error processing content: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Track error in CloudWatch
+        metrics_service.track_error('ContentProcessing', 'process_content', 'Error')
+        
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/ask-question', methods=['POST'])
@@ -461,6 +486,7 @@ def ask_question():
     print(f"🔍 =========================")
     print(f"🔍 ASK QUESTION DEBUG START")
     print(f"🔍 =========================")
+    start_time = datetime.now()
     
     try:
         print(f"🔍 DEBUG: Request method: {request.method}")
@@ -572,6 +598,11 @@ def ask_question():
             except Exception as e:
                 print(f"⚠️  Audio generation failed: {e}")
         
+        # Track CloudWatch metrics for Q&A
+        response_time = (datetime.now() - start_time).total_seconds()
+        has_context = len(session_qa.documents) > 0 if session_qa else False
+        metrics_service.track_question_asked(len(question), response_time, has_context, True)
+        
         return jsonify({
             'answer': answer,
             'audio_url': audio_url,
@@ -583,11 +614,17 @@ def ask_question():
         print(f"❌ Error answering question: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Track error in CloudWatch
+        metrics_service.track_error('QuestionAnswering', 'ask_question', 'Error')
+        
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/transcribe-audio', methods=['POST'])
 def transcribe_audio_question():
     """Transcribe uploaded audio for questions ONLY (live recording from Q&A)"""
+    start_time = datetime.now()
+    
     # Check if transcriber is available
     if not transcriber:
         return jsonify({'error': 'Transcriber not available. Please check server logs.'}), 500
@@ -609,6 +646,10 @@ def transcribe_audio_question():
         if not transcribed_text or len(transcribed_text.strip()) < 2:
             return jsonify({'error': 'Could not transcribe audio. Please try speaking more clearly.'}), 400
         
+        # Track CloudWatch metrics for voice transcription
+        transcription_time = (datetime.now() - start_time).total_seconds()
+        metrics_service.track_voice_usage('recording', transcription_time, True)
+        
         return jsonify({
             'text': transcribed_text,
             'success': True
@@ -616,6 +657,10 @@ def transcribe_audio_question():
                 
     except Exception as e:
         print(f"❌ Error transcribing audio: {e}")
+        
+        # Track error in CloudWatch
+        metrics_service.track_error('VoiceTranscription', 'transcribe_audio', 'Error')
+        
         return jsonify({'error': f'Transcription failed: {str(e)}'}), 500
 
 # Debug and health check routes
@@ -789,6 +834,8 @@ def delete_document():
 @app.route('/api/upload-multiple-files', methods=['POST'])
 def upload_multiple_files():
     """Process multiple files and URLs with optimized batch processing"""
+    start_time = datetime.now()
+    
     try:
         # Get files, media files, and URLs
         files = request.files.getlist('files') if 'files' in request.files else []
@@ -1229,6 +1276,12 @@ def upload_multiple_files():
                     break
         
         # Return response immediately with summary, audio will be generated separately
+        # Track CloudWatch metrics for batch processing
+        processing_time = (datetime.now() - start_time).total_seconds()
+        content_types = [item['type'] for item in input_data]
+        batch_size = len(input_data)
+        metrics_service.track_batch_processing(batch_size, processing_time, content_types, successful_uploads)
+        
         return jsonify({
             'success': successful_uploads > 0,
             'results': results,
@@ -1247,11 +1300,17 @@ def upload_multiple_files():
         print(f"❌ Error in multi-file upload: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Track error in CloudWatch
+        metrics_service.track_error('BatchProcessing', 'upload_multiple_files', 'Error')
+        
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/generate-audio', methods=['POST'])
 def generate_audio():
     """Generate audio for text content (used for progressive UI updates)"""
+    start_time = datetime.now()
+    
     try:
         if not transcriber:
             return jsonify({'error': 'Text-to-speech not available'}), 500
@@ -1267,12 +1326,21 @@ def generate_audio():
         
         try:
             audio_url = transcriber.text_to_speech(text, voice=voice)
+            
+            # Track CloudWatch metrics for TTS
+            tts_time = (datetime.now() - start_time).total_seconds()
+            metrics_service.track_voice_usage('tts', tts_time, True)
+            
             return jsonify({
                 'success': True,
                 'audio_url': audio_url
             })
         except Exception as tts_error:
             print(f"⚠️ TTS generation failed: {tts_error}")
+            
+            # Track TTS error in CloudWatch
+            metrics_service.track_error('TextToSpeech', 'generate_audio', 'Error')
+            
             return jsonify({
                 'success': False,
                 'error': f'Audio generation failed: {str(tts_error)}'
@@ -1280,6 +1348,10 @@ def generate_audio():
             
     except Exception as e:
         print(f"❌ Error in audio generation: {e}")
+        
+        # Track general error in CloudWatch
+        metrics_service.track_error('TextToSpeech', 'generate_audio', 'Error')
+        
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/test-question', methods=['POST'])

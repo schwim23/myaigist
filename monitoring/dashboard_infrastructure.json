@@ -1,0 +1,237 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ECS", "CPUUtilization", "ServiceName", "myaigist-service", "ClusterName", "myaigist-cluster", { "stat": "Average" } ],
+          [ "AWS/ECS", "CPUUtilization", "ServiceName", "myaigist-qa-service", "ClusterName", "myaigist-qa-cluster", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "ECS CPU Utilization",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100,
+            "label": "Percent"
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ECS", "MemoryUtilization", "ServiceName", "myaigist-service", "ClusterName", "myaigist-cluster", { "stat": "Average" } ],
+          [ "AWS/ECS", "MemoryUtilization", "ServiceName", "myaigist-qa-service", "ClusterName", "myaigist-qa-cluster", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "ECS Memory Utilization",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100,
+            "label": "Percent"
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 6,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ECS", "RunningTaskCount", "ServiceName", "myaigist-service", "ClusterName", "myaigist-cluster", { "stat": "Average" } ]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "Production Running Tasks",
+        "period": 300
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 6,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ECS", "RunningTaskCount", "ServiceName", "myaigist-qa-service", "ClusterName", "myaigist-qa-cluster", { "stat": "Average" } ]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "QA Running Tasks",
+        "period": 300
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 6,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", "app/myaigist-alb/7b83cd34f789946f", { "stat": "Average" } ]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "Load Balancer Response Time",
+        "period": 300
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/EFS", "StorageBytes", "FileSystemId", "fs-0cd336ba0439e9836", "StorageClass", "Standard", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "EFS Storage Usage",
+        "period": 3600,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "label": "Bytes"
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/EFS", "ClientConnections", "FileSystemId", "fs-0cd336ba0439e9836", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "EFS Client Connections",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 18,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ApplicationELB", "RequestCount", "LoadBalancer", "app/myaigist-alb/7b83cd34f789946f", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "Load Balancer Request Count",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 18,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ApplicationELB", "HTTPCode_Target_2XX_Count", "LoadBalancer", "app/myaigist-alb/7b83cd34f789946f", { "stat": "Sum" } ],
+          [ ".", "HTTPCode_Target_4XX_Count", ".", ".", { "stat": "Sum" } ],
+          [ ".", "HTTPCode_Target_5XX_Count", ".", ".", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "HTTP Response Codes",
+        "period": 300
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 24,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/EFS", "TotalIOTime", "FileSystemId", "fs-0cd336ba0439e9836", { "stat": "Sum" } ]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "EFS Total IO Time",
+        "period": 3600
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 24,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/EFS", "DataReadIOBytes", "FileSystemId", "fs-0cd336ba0439e9836", { "stat": "Sum" } ],
+          [ ".", "DataWriteIOBytes", ".", ".", { "stat": "Sum" } ]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "EFS Read/Write IO (Bytes)",
+        "period": 3600
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 24,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ApplicationELB", "ActiveConnectionCount", "LoadBalancer", "app/myaigist-alb/7b83cd34f789946f", { "stat": "Sum" } ]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "Active Connections",
+        "period": 300
+      }
+    }
+  ]
+}
